@@ -133,7 +133,6 @@ export function getSupportedChainsForPrivy() {
 export function getSafeWalletFactoryAddress(chainId: number): string {
   const info = chainDefinitions[chainId as SupportedChainId];
   if (!info) {
-    console.warn(`Chain ID ${chainId} not supported`);
     return "";
   }
   return info.safeWalletFactoryAddress;
@@ -145,7 +144,6 @@ export function getSafeWalletFactoryAddress(chainId: number): string {
 export function getSafeModuleAddress(chainId: number): string {
   const info = chainDefinitions[chainId as SupportedChainId];
   if (!info) {
-    console.warn(`Chain ID ${chainId} not supported`);
     return "";
   }
   return info.safeModuleAddress;
