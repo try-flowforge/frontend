@@ -86,24 +86,24 @@ export function DeleteConfirmDialog({
 
       {/* Modal Content */}
       <div
-        className="relative z-50 w-full max-w-[425px] flex flex-col items-center justify-center p-6 gap-4 bg-black/95 border-white/20 border rounded-xl shadow-lg animate-in fade-in-0 zoom-in-95 duration-200"
+        className="relative z-50 w-full max-w-106.25 flex flex-col items-center justify-center p-6 gap-4 bg-black/95 border-white/20 border rounded-xl shadow-lg animate-in fade-in-0 zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         <MdDeleteSweep className="w-16 h-16 text-white" />
 
         {/* Title and Description */}
-          <h2
-            id="delete-dialog-title"
-            className="text-xl font-semibold text-center"
-          >
-            {title}
-          </h2>
-          <p
-            id="delete-dialog-description"
-            className="text-base text-center max-w-[80%]"
-          >
-            {description}
-          </p>
+        <h2
+          id="delete-dialog-title"
+          className="text-xl font-semibold text-center"
+        >
+          {title}
+        </h2>
+        <p
+          id="delete-dialog-description"
+          className="text-base text-center max-w-[80%]"
+        >
+          {description}
+        </p>
 
         {/* Action Buttons */}
         <div className="flex gap-3 w-full justify-center pt-2">
@@ -111,14 +111,14 @@ export function DeleteConfirmDialog({
             onClick={handleCancel}
             variant="delete"
             border
-            className="flex-1 min-w-[100px]"
+            className="flex-1 min-w-25"
           >
             Cancel
           </Button>
           <Button
             onClick={handleConfirm}
             variant="delete"
-            className="flex-1 min-w-[100px]"
+            className="flex-1 min-w-25"
           >
             Delete
           </Button>

@@ -27,17 +27,6 @@ export interface SwitchNodeProps extends NodeProps<SwitchNodeData> {
   targetPosition?: Position;
 }
 
-/**
- * SwitchNode - Multi-branch routing node for workflow canvas
- *
- * Features:
- * - Card-based surface design
- * - 1 input handle (target)
- * - Dynamic output handles based on configured cases (max 5)
- * - Icon support via iconName (serializable)
- * - Token-based styling
- * - Memoized for performance
- */
 export function SwitchNode({
   id,
   data,
@@ -112,10 +101,9 @@ export function SwitchNode({
 
       <SimpleCard
         className={cn(
-          "w-16 transition-all relative",
-          "border border-foreground/20 bg-card",
-          "rounded-lg",
-          selected && "ring-2 ring-primary/50 shadow-lg border-primary/30"
+          "w-16 h-16 transition-all relative",
+          "border border-white/10 bg-white/5 rounded-lg",
+          selected && "ring-0.5 ring-white/30 border-white/40 shadow-md"
         )}
         style={{
           // Dynamic height based on case count
