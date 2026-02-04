@@ -6,6 +6,7 @@ import { PrivyProvider } from "@privy-io/react-auth";
 import { getSupportedChainsForPrivy, getDefaultChainForPrivy } from "@/web3/chains";
 import { SafeWalletProvider } from "@/context/SafeWalletContext";
 import { OnboardingProvider } from "@/context/OnboardingContext";
+import { ToastProvider } from "@/context/ToastContext";
 import { OnboardingSetupModal } from "@/components/onboard/OnboardingSetupModal";
 import { LenisProvider } from "./LenisProvider";
 
@@ -31,33 +32,35 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     const defaultChain = getDefaultChainForPrivy();
 
     return (
-        <LenisProvider>
-            <PrivyProvider
-                appId={privyAppId}
-                config={{
-                    loginMethods: ["email"],
-                    embeddedWallets: {
-                        ethereum: {
-                            createOnLogin: "users-without-wallets",
+        <ToastProvider>
+            <LenisProvider>
+                <PrivyProvider
+                    appId={privyAppId}
+                    config={{
+                        loginMethods: ["email"],
+                        embeddedWallets: {
+                            ethereum: {
+                                createOnLogin: "users-without-wallets",
+                            },
                         },
-                    },
-                    appearance: {
-                        theme: "dark",
-                        accentColor: "#FF6500",
-                    },
-                    defaultChain: defaultChain,
-                    supportedChains: supportedChains,
-                }}
-            >
-                <QueryClientProvider client={queryClient}>
-                    <OnboardingProvider>
-                        <SafeWalletProvider>
-                            {children}
-                            <OnboardingSetupModal />
-                        </SafeWalletProvider>
-                    </OnboardingProvider>
-                </QueryClientProvider>
-            </PrivyProvider>
-        </LenisProvider>
+                        appearance: {
+                            theme: "dark",
+                            accentColor: "#FF6500",
+                        },
+                        defaultChain: defaultChain,
+                        supportedChains: supportedChains,
+                    }}
+                >
+                    <QueryClientProvider client={queryClient}>
+                        <OnboardingProvider>
+                            <SafeWalletProvider>
+                                {children}
+                                <OnboardingSetupModal />
+                            </SafeWalletProvider>
+                        </OnboardingProvider>
+                    </QueryClientProvider>
+                </PrivyProvider>
+            </LenisProvider>
+        </ToastProvider>
     );
 }
