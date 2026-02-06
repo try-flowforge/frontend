@@ -4,12 +4,9 @@
  */
 
 export {
-  getFrontendMode,
   fetchBackendRuntimeConfig,
-  assertModeMatchOrThrow,
   getOnboardingChains,
   validateAndGetOnboardingChains,
-  ModeMismatchError,
   type BackendRuntimeConfig,
 } from "./config";
 

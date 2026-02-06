@@ -89,8 +89,15 @@ export const API_CONFIG = {
 } as const;
 
 /**
- * Helper to build full API URL
+ * Helper to build full API URL.
+ * Throws if NEXT_PUBLIC_API_BASE_URL is not set so misconfiguration is obvious.
  */
 export function buildApiUrl(endpoint: string): string {
-  return `${API_CONFIG.BASE_URL}${endpoint}`;
+  const base = API_CONFIG.BASE_URL;
+  if (typeof base !== "string" || base === "" || base === "undefined") {
+    throw new Error(
+      "NEXT_PUBLIC_API_BASE_URL is not set. Add it to .env.local (e.g. http://localhost:3001/api/v1)."
+    );
+  }
+  return `${base}${endpoint}`;
 }

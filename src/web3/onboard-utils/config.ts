@@ -1,6 +1,6 @@
 /**
  * Onboarding Configuration Module
- * This module handles mode detection, backend handshake, and validation
+ * Fetches backend runtime config and provides chains for Safe onboarding
  */
 
 import { API_CONFIG, buildApiUrl } from "@/config/api";
@@ -20,29 +20,6 @@ export interface BackendRuntimeConfig {
     rpcUrl: string;
   }>;
   timestamp: string;
-}
-
-/**
- * Mode mismatch error with actionable details
- */
-export class ModeMismatchError extends Error {
-  constructor(
-    public frontendMode: boolean,
-    public backendMode: boolean,
-  ) {
-    super(
-      `Configuration mismatch: Frontend NEXT_PUBLIC_USE_TESTNET_ONLY=${frontendMode}, Backend USE_TESTNET_ONLY=${backendMode}. ` +
-        `Please ensure both frontend and backend environment variables match.`,
-    );
-    this.name = "ModeMismatchError";
-  }
-}
-
-/**
- * Get frontend mode (from NEXT_PUBLIC_USE_TESTNET_ONLY)
- */
-export function getFrontendMode(): boolean {
-  return FRONTEND_USE_TESTNET_ONLY;
 }
 
 /**
@@ -67,36 +44,20 @@ export async function fetchBackendRuntimeConfig(): Promise<BackendRuntimeConfig>
 }
 
 /**
- * Assert that frontend and backend modes match, throw ModeMismatchError if not
- */
-export function assertModeMatchOrThrow(
-  backendConfig: BackendRuntimeConfig,
-): void {
-  const frontendMode = getFrontendMode();
-  const backendMode = backendConfig.useTestnetOnly;
-
-  if (frontendMode !== backendMode) {
-    throw new ModeMismatchError(frontendMode, backendMode);
-  }
-}
-
-/**
- * Get chains to onboard (after mode validation)
+ * Get chains to onboard
  */
 export function getOnboardingChains(): ChainDefinition[] {
   return getSelectableChains();
 }
 
 /**
- * Validate backend runtime config and return onboarding chains
- * Throws ModeMismatchError if modes don't match
+ * Fetch backend config and return onboarding chains
  */
 export async function validateAndGetOnboardingChains(): Promise<{
   chains: ChainDefinition[];
   backendConfig: BackendRuntimeConfig;
 }> {
   const backendConfig = await fetchBackendRuntimeConfig();
-  assertModeMatchOrThrow(backendConfig);
   const chains = getOnboardingChains();
 
   return { chains, backendConfig };

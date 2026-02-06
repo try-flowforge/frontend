@@ -18,7 +18,6 @@ import {
     ensureChainSelected,
     waitForChain,
     verifyModuleEnabled,
-    ModeMismatchError,
 } from "@/web3/onboard-utils";
 
 export type OnboardingStepStatus = "idle" | "pending" | "success" | "error";
@@ -141,15 +140,9 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 setIsModeValid(true);
                 setChainsToSetup(chains);
                 setProgress(initializeProgress(chains));
-            } catch (error) {
-                if (error instanceof ModeMismatchError) {
-                    setIsModeValid(false);
-                    setChainsToSetup([]);
-                } else {
-                    //Failed to validate onboarding mode
-                    setIsModeValid(false);
-                    setChainsToSetup([]);
-                }
+            } catch {
+                setIsModeValid(false);
+                setChainsToSetup([]);
             }
         };
 
