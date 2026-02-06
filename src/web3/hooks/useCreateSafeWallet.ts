@@ -67,7 +67,7 @@ export const useCreateSafeWallet = () => {
         return {
           success: false,
           safeAddress: null,
-          error: `Unsupported chain. Please switch to Arbitrum Sepolia (${CHAIN_IDS.ARBITRUM_SEPOLIA}) or Arbitrum Mainnet (${CHAIN_IDS.ARBITRUM_MAINNET}). Current chain: ${effectiveChainId}`,
+          error: `Unsupported chain. Please switch to Ethereum Sepolia (${CHAIN_IDS.ETHEREUM_SEPOLIA}), Arbitrum Sepolia (${CHAIN_IDS.ARBITRUM_SEPOLIA}), or Arbitrum Mainnet (${CHAIN_IDS.ARBITRUM_MAINNET}). Current chain: ${effectiveChainId}`,
         };
       }
 
@@ -192,7 +192,7 @@ export const useCreateSafeWallet = () => {
       if (!isSupportedChain(effectiveChainId)) {
         return {
           success: false,
-          error: `Unsupported chain. Please switch to Arbitrum Sepolia (${CHAIN_IDS.ARBITRUM_SEPOLIA}) or Arbitrum Mainnet (${CHAIN_IDS.ARBITRUM_MAINNET}). Current chain: ${effectiveChainId}`,
+          error: `Unsupported chain. Please switch to Ethereum Sepolia (${CHAIN_IDS.ETHEREUM_SEPOLIA}), Arbitrum Sepolia (${CHAIN_IDS.ARBITRUM_SEPOLIA}), or Arbitrum Mainnet (${CHAIN_IDS.ARBITRUM_MAINNET}). Current chain: ${effectiveChainId}`,
         };
       }
 
@@ -362,7 +362,7 @@ export const useCreateSafeWallet = () => {
       if (!isSupportedChain(chainId)) {
         return {
           success: false,
-          error: `Unsupported chain. Please switch to Arbitrum Sepolia (${CHAIN_IDS.ARBITRUM_SEPOLIA}) or Arbitrum Mainnet (${CHAIN_IDS.ARBITRUM_MAINNET}). Current chain: ${chainId}`,
+          error: `Unsupported chain. Please switch to Ethereum Sepolia (${CHAIN_IDS.ETHEREUM_SEPOLIA}), Arbitrum Sepolia (${CHAIN_IDS.ARBITRUM_SEPOLIA}), or Arbitrum Mainnet (${CHAIN_IDS.ARBITRUM_MAINNET}). Current chain: ${chainId}`,
         };
       }
 

@@ -7,7 +7,7 @@ import { api } from "@/lib/api-client";
 import { API_CONFIG } from "@/config/api";
 
 export type OracleProvider = "CHAINLINK" | "PYTH";
-export type OracleChain = "ARBITRUM" | "ARBITRUM_SEPOLIA";
+export type OracleChain = "ARBITRUM" | "ARBITRUM_SEPOLIA" | "ETHEREUM_SEPOLIA";
 export type FeedCategory = "crypto" | "forex" | "commodities";
 
 export interface PriceFeed {
@@ -114,6 +114,7 @@ export function getChainLabel(chain: OracleChain): string {
   const labels: Record<OracleChain, string> = {
     ARBITRUM: "Arbitrum One (Mainnet)",
     ARBITRUM_SEPOLIA: "Arbitrum Sepolia (Testnet)",
+    ETHEREUM_SEPOLIA: "Ethereum Sepolia (Testnet)",
   };
   return labels[chain];
 }

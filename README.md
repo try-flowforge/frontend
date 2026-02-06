@@ -35,11 +35,12 @@ Create `.env.local` with:
 | -------- | ----------- |
 | `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL (no trailing slash), e.g. `http://localhost:3000/api/v1` |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy app ID for embedded wallet auth |
-| `NEXT_PUBLIC_USE_TESTNET_ONLY` | `true` for testnet-only mode |
-| `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS` | Safe factory (testnet) |
-| `NEXT_PUBLIC_SAFE_MODULE_ADDRESS` | Safe module (testnet) |
-| `NEXT_PUBLIC_MAINNET_SAFE_WALLET_FACTORY_ADDRESS` | Safe factory (mainnet) |
-| `NEXT_PUBLIC_MAINNET_SAFE_MODULE_ADDRESS` | Safe module (mainnet) |
+| `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_11155111` | Safe factory (Ethereum Sepolia) |
+| `NEXT_PUBLIC_SAFE_MODULE_ADDRESS_11155111` | Safe module (Ethereum Sepolia) |
+| `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_421614` | Safe factory (Arbitrum Sepolia) |
+| `NEXT_PUBLIC_SAFE_MODULE_ADDRESS_421614` | Safe module (Arbitrum Sepolia) |
+| `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_42161` | Safe factory (Arbitrum Mainnet) |
+| `NEXT_PUBLIC_SAFE_MODULE_ADDRESS_42161` | Safe module (Arbitrum Mainnet) |
 
 ```bash
 yarn run dev

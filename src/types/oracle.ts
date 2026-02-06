@@ -11,6 +11,7 @@ export enum OracleProvider {
 export enum OracleChain {
     ARBITRUM = "ARBITRUM",
     ARBITRUM_SEPOLIA = "ARBITRUM_SEPOLIA",
+    ETHEREUM_SEPOLIA = "ETHEREUM_SEPOLIA",
 }
 
 /**
@@ -44,9 +45,33 @@ export const CHAINLINK_PRICE_FEEDS: ChainlinkPriceFeed[] = [
     },
     {
         symbol: "ETH/USD",
-        address: "0x639Fe6ab55C921647C C93A6C8766f4346C6F3",
+        address: "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
         chain: OracleChain.ARBITRUM,
         description: "Ethereum / US Dollar",
+    },
+    {
+        symbol: "ETH/USD",
+        address: "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+        chain: OracleChain.ETHEREUM_SEPOLIA,
+        description: "Ethereum / US Dollar",
+    },
+    {
+        symbol: "BTC/USD",
+        address: "0x1b44F3514812d835EB1B450AFB6BC2d37093bF56",
+        chain: OracleChain.ETHEREUM_SEPOLIA,
+        description: "Bitcoin / US Dollar",
+    },
+    {
+        symbol: "USDC/USD",
+        address: "0xA2F78ab2355fe2f984D808B5CeE7FD964A160109",
+        chain: OracleChain.ETHEREUM_SEPOLIA,
+        description: "USD Coin / US Dollar",
+    },
+    {
+        symbol: "LINK/USD",
+        address: "0xc59E3633BAAC77393d640F2Be3F7246B906e050",
+        chain: OracleChain.ETHEREUM_SEPOLIA,
+        description: "Chainlink / US Dollar",
     },
 ];
 
@@ -114,5 +139,6 @@ export function isValidPythFeedId(feedId: string): boolean {
 export const ORACLE_CHAIN_LABELS: Record<OracleChain, string> = {
     [OracleChain.ARBITRUM]: "Arbitrum",
     [OracleChain.ARBITRUM_SEPOLIA]: "Arbitrum Sepolia (Testnet)",
+    [OracleChain.ETHEREUM_SEPOLIA]: "Ethereum Sepolia (Testnet)",
 };
 

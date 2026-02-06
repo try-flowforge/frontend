@@ -5,16 +5,12 @@
 
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 import type { ChainDefinition } from "@/web3/chains";
-import {
-  USE_TESTNET_ONLY as FRONTEND_USE_TESTNET_ONLY,
-  getSelectableChains,
-} from "@/web3/chains";
+import { getSelectableChains } from "@/web3/chains";
 
 /**
  * Runtime configuration from backend
  */
 export interface BackendRuntimeConfig {
-  useTestnetOnly: boolean;
   activeChains: number[];
   chainDetails: Array<{
     chainId: number;

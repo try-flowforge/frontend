@@ -7,6 +7,7 @@
 export enum SupportedChain {
     ARBITRUM = 'ARBITRUM',
     ARBITRUM_SEPOLIA = 'ARBITRUM_SEPOLIA',
+    ETHEREUM_SEPOLIA = 'ETHEREUM_SEPOLIA',
 }
 
 // Supported Swap Providers
@@ -131,6 +132,31 @@ export const ARBITRUM_MAINNET_TOKENS: TokenInfo[] = [
 ];
 
 /**
+ * Ethereum Sepolia Testnet Tokens
+ * Standard token addresses on Ethereum Sepolia
+ */
+export const ETHEREUM_SEPOLIA_TOKENS: TokenInfo[] = [
+    {
+        address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+        symbol: 'WETH',
+        decimals: 18,
+        name: 'Wrapped Ether',
+    },
+    {
+        address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+        symbol: 'USDC',
+        decimals: 6,
+        name: 'USD Coin',
+    },
+    {
+        address: '0x779877A7B0D9E8603169dddb7831e2F6F0dE442f',
+        symbol: 'LINK',
+        decimals: 18,
+        name: 'Chainlink Token',
+    },
+];
+
+/**
  * Arbitrum Sepolia Testnet Tokens
  * Tokens with verified Uniswap V3 pools on Sepolia testnet
  * These are official testnet token addresses
@@ -178,6 +204,8 @@ export function getTokensForChain(chain: SupportedChain): TokenInfo[] {
             return ARBITRUM_MAINNET_TOKENS;
         case SupportedChain.ARBITRUM_SEPOLIA:
             return ARBITRUM_SEPOLIA_TOKENS;
+        case SupportedChain.ETHEREUM_SEPOLIA:
+            return ETHEREUM_SEPOLIA_TOKENS;
         default:
             return ARBITRUM_MAINNET_TOKENS;
     }
@@ -195,6 +223,7 @@ export function allowsCustomTokens(chain: SupportedChain): boolean {
 export const CHAIN_LABELS: Record<SupportedChain, string> = {
     [SupportedChain.ARBITRUM]: 'Arbitrum',
     [SupportedChain.ARBITRUM_SEPOLIA]: 'Arbitrum Sepolia',
+    [SupportedChain.ETHEREUM_SEPOLIA]: 'Ethereum Sepolia',
 };
 
 export const PROVIDER_LABELS: Record<SwapProvider, string> = {
@@ -212,16 +241,16 @@ export const SWAP_TYPE_LABELS: Record<SwapType, string> = {
 // Slippage presets
 export const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0, 2.5];
 
-// Default swap configuration
+// Default swap configuration (default chain: Arbitrum Sepolia)
 export const DEFAULT_SWAP_CONFIG: Partial<SwapNodeConfig> = {
     provider: SwapProvider.UNISWAP,
-    chain: SupportedChain.ARBITRUM,
+    chain: SupportedChain.ARBITRUM_SEPOLIA,
     simulateFirst: true,
     autoRetryOnFailure: true,
     maxRetries: 3,
     inputConfig: {
-        sourceToken: ARBITRUM_TOKENS[1], // USDC
-        destinationToken: ARBITRUM_TOKENS[0], // WETH
+        sourceToken: ARBITRUM_SEPOLIA_TOKENS[1], // USDC
+        destinationToken: ARBITRUM_SEPOLIA_TOKENS[0], // WETH
         amount: '',
         swapType: SwapType.EXACT_INPUT,
         walletAddress: '',

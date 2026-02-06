@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
 import { usePrivyWallet } from '@/hooks/usePrivyWallet';
 import { useSafeWalletContext } from '@/context/SafeWalletContext';
-import { isTestnet, getTargetChainId, USE_TESTNET_ONLY } from '@/web3/chains';
+import { isTestnet, getTargetChainId } from '@/web3/chains';
 import { Avatar } from './Avatar';
 import { Switch } from './Switch';
 import { CopyButton } from '../ui/CopyButton';
@@ -32,10 +32,9 @@ export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Network Configurations & use
+  // Network configurations
   const currentChainId = chainId;
-  const isTestnetOnlyMode = USE_TESTNET_ONLY;
-  const isTestnetMode = isTestnetOnlyMode || isTestnet(currentChainId);
+  const isTestnetMode = isTestnet(currentChainId);
 
   // Get email (may be undefined)
   const email = user?.email?.address;
@@ -61,11 +60,6 @@ export function UserMenu() {
   if (!email) return null;
 
   const handleTestnetToggle = async (checked: boolean) => {
-    if (isTestnetOnlyMode) {
-      // console.log('Network switching is disabled in testnet-only mode');
-      return;
-    }
-
     try {
       const targetChainId = getTargetChainId(checked);
 
@@ -161,7 +155,7 @@ export function UserMenu() {
               <Switch
                 checked={isTestnetMode}
                 onCheckedChange={handleTestnetToggle}
-                disabled={isTestnetOnlyMode}
+                disabled={false}
                 gradient={gradient}
               />
             </div>
