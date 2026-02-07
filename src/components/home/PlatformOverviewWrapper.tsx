@@ -8,6 +8,7 @@ import {
     type MotionValue,
 } from "framer-motion";
 import { MadeEasySection } from "./MadeEasySection";
+import { FunctionalitySection } from "./FunctionalitySection";
 
 type PlatformOverviewWrapperProps = {
     externalProgress?: MotionValue<number>;
@@ -42,7 +43,7 @@ export function PlatformOverviewWrapper({
     // C. Solution Timeline:
     // Consumes the last 50% of the scroll. Maps 0.5-1.0 to 0.0-1.0.
     // Before 0.5, it stays at 0 (waiting).
-    // const solutionProgress = useTransform(masterProgress, [0.8, 1], [0, 1]);
+    const solutionProgress = useTransform(masterProgress, [0.8, 1], [0, 1]);
 
     return (
         <section ref={containerRef} className="relative h-[1000vh] bg-black z-50">
@@ -57,9 +58,9 @@ export function PlatformOverviewWrapper({
                             progressExternal={problemProgress}
                         />
                     </div>
-                    {/* <div className="w-screen h-screen shrink-0 overflow-hidden">
-                        <SolutionSection progress={solutionProgress} />
-                    </div> */}
+                    <div className="w-screen h-screen shrink-0 overflow-hidden">
+                        <FunctionalitySection progress={solutionProgress} />
+                    </div>
                 </motion.div>
             </div>
         </section>
