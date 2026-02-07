@@ -28,11 +28,12 @@ import {
     InterestRateMode,
     LendingTokenInfo,
     LendingInputConfig,
-    getTokensForLendingProvider,
     LENDING_OPERATION_LABELS,
     INTEREST_RATE_MODE_LABELS,
     SupportedChain,
+    getLendingTokensForChain,
 } from "@/types/lending";
+import { CHAIN_IDS } from "@/web3/chains";
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 
 interface LendingNodeConfigurationProps {
@@ -82,7 +83,7 @@ const COMPOUND_COMET_ADDRESS = '0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA';
  * - Quote preview with APY and health factor
  * - Position display showing current supplied/borrowed amounts
  * 
- * Note: Lending is only available on Arbitrum mainnet
+ * Note: Lending is available on Arbitrum and Ethereum Sepolia
  */
 export function LendingNodeConfiguration({
     nodeData,
@@ -96,6 +97,7 @@ export function LendingNodeConfiguration({
 
     const { selection } = useSafeWalletContext();
     const selectedSafe = selection.selectedSafe;
+    const { chainId: currentChainId } = useWallets().wallets.find(w => w.walletClientType === "privy") || { chainId: null };
 
     // Local state
     const [quoteState, setQuoteState] = useState<QuoteState>({
@@ -122,10 +124,11 @@ export function LendingNodeConfiguration({
     // Get the wallet address to use (Safe or EOA)
     const effectiveWalletAddress = selectedSafe || walletAddress;
 
-    // Get available tokens for the provider
+    // Get available tokens for the provider and chain
     const availableTokens = useMemo(() => {
-        return getTokensForLendingProvider(lendingProvider);
-    }, [lendingProvider]);
+        const chain = (nodeData.lendingChain as SupportedChain) || SupportedChain.ARBITRUM;
+        return getLendingTokensForChain(lendingProvider, chain);
+    }, [lendingProvider, nodeData.lendingChain]);
 
     // Track previous wallet address to avoid unnecessary updates
     const prevWalletRef = React.useRef<string | null>(null);
@@ -143,9 +146,10 @@ export function LendingNodeConfiguration({
             updates.walletAddress = effectiveWalletAddress;
         }
 
-        // Ensure chain is always Arbitrum mainnet for lending
-        if (nodeData.lendingChain !== SupportedChain.ARBITRUM) {
-            updates.lendingChain = SupportedChain.ARBITRUM;
+        // Set chain automatically based on current network if not set
+        const targetChain = Number(currentChainId) === CHAIN_IDS.ETHEREUM_SEPOLIA ? SupportedChain.ETHEREUM_SEPOLIA : SupportedChain.ARBITRUM;
+        if (nodeData.lendingChain !== targetChain) {
+            updates.lendingChain = targetChain;
         }
 
         if (Object.keys(updates).length > 0) {
@@ -217,7 +221,8 @@ export function LendingNodeConfiguration({
                     : undefined,
             };
 
-            const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.LENDING.QUOTE)}/${lendingProvider}/${SupportedChain.ARBITRUM}`;
+            const chain = (nodeData.lendingChain as SupportedChain) || SupportedChain.ARBITRUM;
+            const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.LENDING.QUOTE)}/${lendingProvider}/${chain}`;
 
             const response = await fetch(url, {
                 method: "POST",
@@ -277,6 +282,7 @@ export function LendingNodeConfiguration({
         lendingOperation,
         interestRateMode,
         handleDataChange,
+        nodeData.lendingChain,
     ]);
 
     // Fetch current position
@@ -286,7 +292,8 @@ export function LendingNodeConfiguration({
         setPositionState({ loading: true, error: null, data: null });
 
         try {
-            const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.LENDING.POSITION)}/${lendingProvider}/${SupportedChain.ARBITRUM}/${effectiveWalletAddress}?asset=${assetAddress}`;
+            const chain = (nodeData.lendingChain as SupportedChain) || SupportedChain.ARBITRUM;
+            const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.LENDING.POSITION)}/${lendingProvider}/${chain}/${effectiveWalletAddress}?asset=${assetAddress}`;
 
             const response = await fetch(url);
 
@@ -330,7 +337,7 @@ export function LendingNodeConfiguration({
                 data: null,
             });
         }
-    }, [assetAddress, assetDecimals, effectiveWalletAddress, lendingProvider, handleDataChange]);
+    }, [assetAddress, assetDecimals, effectiveWalletAddress, lendingProvider, handleDataChange, nodeData.lendingChain]);
 
     // Handle copy to clipboard
     const handleCopyAddress = useCallback(async () => {
@@ -408,7 +415,7 @@ export function LendingNodeConfiguration({
                 <div className="flex items-center gap-2">
                     <LuShield className="w-4 h-4 text-primary" />
                     <Typography variant="caption" className="text-primary">
-                        Lending is only available on Arbitrum Mainnet
+                        Lending is available on Arbitrum Mainnet and Ethereum Sepolia
                     </Typography>
                 </div>
             </SimpleCard>

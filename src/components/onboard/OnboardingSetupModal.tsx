@@ -164,7 +164,7 @@ export const OnboardingSetupModal: React.FC = () => {
 
     // Calculate completion status
     const allComplete = chainsToSetup.every((chain) => {
-        const chainProgress = progress[chain.key];
+        const chainProgress = progress[chain.id];
         return (
             chainProgress?.walletCreate === "success" &&
             chainProgress?.moduleSign === "success" &&
@@ -223,16 +223,16 @@ export const OnboardingSetupModal: React.FC = () => {
                 <div className="w-full space-y-4 max-h-80 overflow-y-auto">
                     {chainsToSetup.map((chain) => (
                         <ChainProgressCard
-                            key={chain.key}
+                            key={chain.id}
                             chain={chain}
-                            progress={progress[chain.key] || {
+                            progress={progress[chain.id] || {
                                 walletCreate: "idle",
                                 moduleSign: "idle",
                                 moduleEnable: "idle",
                                 moduleVerify: "idle",
                             }}
-                            isSigning={currentSigningChain === chain.key}
-                            onRetry={() => retryChain(chain.key)}
+                            isSigning={currentSigningChain === String(chain.id)}
+                            onRetry={() => retryChain(chain.id)}
                         />
                     ))}
                 </div>

@@ -146,9 +146,9 @@ export function OracleNodeConfigurationV2({
 
     // Get chain badge color
     const getChainBadgeColor = (chain: OracleChain) => {
-        return chain === "ARBITRUM"
-            ? "bg-green-500/20 text-green-400 border-green-500/30"
-            : "bg-orange-500/20 text-orange-400 border-orange-500/30";
+        if (chain === "ARBITRUM") return "bg-green-500/20 text-green-400 border-green-500/30";
+        if (chain === "ARBITRUM_SEPOLIA") return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+        return "bg-blue-500/20 text-blue-400 border-blue-500/30"; // Ethereum Sepolia
     };
 
     return (
@@ -215,7 +215,7 @@ export function OracleNodeConfigurationV2({
                 </Typography>
 
                 <div className="grid grid-cols-1 gap-2">
-                    {(["ARBITRUM_SEPOLIA", "ARBITRUM"] as OracleChain[]).map((chain) => (
+                    {(["ARBITRUM_SEPOLIA", "ETHEREUM_SEPOLIA", "ARBITRUM"] as OracleChain[]).map((chain) => (
                         <button
                             key={chain}
                             onClick={() => handleChainChange(chain)}

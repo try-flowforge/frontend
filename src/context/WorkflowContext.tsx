@@ -22,7 +22,7 @@ import { generateIconRegistry } from "@/blocks/registry";
 import type { BlockDefinition } from "@/blocks/types";
 import { BlockProvider, useBlock } from "@/blocks/context";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
-import { isTestnet, isMainnet } from "@/web3/chains";
+import { isTestnet, isMainnet, CHAIN_IDS } from "@/web3/chains";
 import { SaveWorkflowModal } from "@/components/workspace/SaveWorkflowModal";
 import { useCanvasDimensions } from "@/hooks/useCanvasDimensions";
 import { useUnsavedChanges } from "@/hooks/useWorkflowState";
@@ -943,8 +943,12 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
       }
 
       // Disable Aave and Compound on Arbitrum Sepolia (testnet)
+      // Note: Aave IS available on Ethereum Sepolia
       const isTestnetChain = isTestnet(chainId);
-      if ((blockId === "aave" || blockId === "compound") && isTestnetChain) {
+      if (blockId === "aave" && isTestnetChain && chainId !== CHAIN_IDS.ETHEREUM_SEPOLIA) {
+        return true;
+      }
+      if (blockId === "compound" && isTestnetChain) {
         return true;
       }
 

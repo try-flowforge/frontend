@@ -220,11 +220,41 @@ export const COMPOUND_ARBITRUM_TOKENS: LendingTokenInfo[] = [
 ];
 
 /**
- * Get tokens for a specific lending provider
- * @param provider - The lending provider to get tokens for
- * @returns Array of LendingTokenInfo for the specified provider
+ * Common tokens supported in Aave V3 on Ethereum Sepolia
  */
-export function getTokensForLendingProvider(provider: LendingProvider): LendingTokenInfo[] {
+export const AAVE_ETHEREUM_SEPOLIA_TOKENS: LendingTokenInfo[] = [
+    {
+        address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
+        symbol: 'WETH',
+        decimals: 18,
+        name: 'Wrapped Ether',
+    },
+    {
+        address: '0x94a9D9AC8a2410350168e3d824A2207D9d6AB272',
+        symbol: 'USDC',
+        decimals: 6,
+        name: 'USD Coin',
+    },
+    {
+        address: '0xFF34B24F1890189744733173766BA299ad5c7730',
+        symbol: 'DAI',
+        decimals: 18,
+        name: 'Dai Stablecoin',
+    },
+];
+
+/**
+ * Get tokens for a specific lending provider and chain
+ * @param provider - The lending provider
+ * @param chain - The supported chain
+ * @returns Array of LendingTokenInfo
+ */
+export function getLendingTokensForChain(provider: LendingProvider, chain: SupportedChain): LendingTokenInfo[] {
+    if (chain === SupportedChain.ETHEREUM_SEPOLIA) {
+        return provider === LendingProvider.AAVE ? AAVE_ETHEREUM_SEPOLIA_TOKENS : [];
+    }
+
+    // Default to Arbitrum
     switch (provider) {
         case LendingProvider.AAVE:
             return AAVE_ARBITRUM_TOKENS;
@@ -233,6 +263,15 @@ export function getTokensForLendingProvider(provider: LendingProvider): LendingT
         default:
             return AAVE_ARBITRUM_TOKENS;
     }
+}
+
+/**
+ * Get tokens for a specific lending provider (Deprecated: use getLendingTokensForChain)
+ * @param provider - The lending provider to get tokens for
+ * @returns Array of LendingTokenInfo for the specified provider
+ */
+export function getTokensForLendingProvider(provider: LendingProvider): LendingTokenInfo[] {
+    return getLendingTokensForChain(provider, SupportedChain.ARBITRUM);
 }
 
 // Display labels for enums
@@ -258,7 +297,7 @@ export const INTEREST_RATE_MODE_LABELS: Record<InterestRateMode, string> = {
 // Default lending configuration
 export const DEFAULT_LENDING_CONFIG = {
     provider: LendingProvider.AAVE,
-    chain: SupportedChain.ARBITRUM, // Lending only on mainnet
+    chain: SupportedChain.ARBITRUM,
     operation: LendingOperation.SUPPLY,
     simulateFirst: true,
     interestRateMode: InterestRateMode.VARIABLE,

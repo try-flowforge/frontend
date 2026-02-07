@@ -9,7 +9,7 @@ import {
 /**
  * Aave Lending Block Definition
  * Allows users to supply, withdraw, borrow, and repay via Aave V3
- * Only available on Arbitrum mainnet
+ * Available on Arbitrum and Ethereum Sepolia
  */
 export const aaveBlock: BlockDefinition = {
     id: "aave",

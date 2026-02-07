@@ -24,7 +24,7 @@ import { ethers } from "ethers";
 import { useSafeWalletContext } from "@/context/SafeWalletContext";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 import Safe from "@safe-global/protocol-kit";
-import { isTestnet } from "@/web3/chains";
+import { CHAIN_IDS } from "@/web3/chains";
 import {
     SwapProvider,
     SupportedChain,
@@ -140,7 +140,10 @@ export function SwapNodeConfiguration({
 
     // Convert chainId to SupportedChain enum
     const getChainFromChainId = useCallback((chainId: number | null): SupportedChain => {
-        if (isTestnet(chainId)) {
+        if (chainId === CHAIN_IDS.ETHEREUM_SEPOLIA) {
+            return SupportedChain.ETHEREUM_SEPOLIA;
+        }
+        if (chainId === CHAIN_IDS.ARBITRUM_SEPOLIA) {
             return SupportedChain.ARBITRUM_SEPOLIA;
         }
         // Default to Arbitrum mainnet

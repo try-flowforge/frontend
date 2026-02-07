@@ -42,8 +42,8 @@ const chainDefinitions: Readonly<Record<SupportedChainId, ChainDefinition>> = {
     explorerUrl: "https://sepolia.arbiscan.io",
     isTestnet: true,
     safeWalletFactoryAddress:
-      process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS!,
-    safeModuleAddress: process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS!,
+      process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_421614!,
+    safeModuleAddress: process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS_421614!,
   },
   [CHAIN_IDS.ARBITRUM_MAINNET]: {
     id: CHAIN_IDS.ARBITRUM_MAINNET,
@@ -52,19 +52,24 @@ const chainDefinitions: Readonly<Record<SupportedChainId, ChainDefinition>> = {
     explorerUrl: "https://arbiscan.io",
     isTestnet: false,
     safeWalletFactoryAddress:
-      process.env.NEXT_PUBLIC_MAINNET_SAFE_WALLET_FACTORY_ADDRESS!,
-    safeModuleAddress: process.env.NEXT_PUBLIC_MAINNET_SAFE_MODULE_ADDRESS!,
+      process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_42161!,
+    safeModuleAddress: process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS_42161!,
   },
 };
 
 // Pre-computed arrays (allocated once at module load)
+export const USE_TESTNET_ONLY = process.env.NEXT_PUBLIC_USE_TESTNET_ONLY === "true";
+
 const ALL_CHAINS: ChainDefinition[] = [
   chainDefinitions[CHAIN_IDS.ARBITRUM_SEPOLIA],
   chainDefinitions[CHAIN_IDS.ETHEREUM_SEPOLIA],
   chainDefinitions[CHAIN_IDS.ARBITRUM_MAINNET],
-];
+].filter(chain => !USE_TESTNET_ONLY || chain.isTestnet);
 
-const PRIVY_CHAINS_ALL = [arbitrumSepolia, sepolia, arbitrum];
+const PRIVY_CHAINS_ALL = [arbitrumSepolia, sepolia, arbitrum].filter(chain => {
+  if (!USE_TESTNET_ONLY) return true;
+  return chain.id === CHAIN_IDS.ARBITRUM_SEPOLIA || chain.id === CHAIN_IDS.ETHEREUM_SEPOLIA;
+});
 
 // Re-export viem chains
 export { arbitrum, arbitrumSepolia, sepolia };

@@ -41,6 +41,7 @@ export interface UserData {
     onboarded_at: string;
     safe_wallet_address_testnet?: string;
     safe_wallet_address_mainnet?: string;
+    safe_wallet_address_eth_sepolia?: string;
 }
 
 export interface OnboardingContextType {
@@ -55,7 +56,7 @@ export interface OnboardingContextType {
 
     // Actions
     startOnboarding: () => Promise<void>;
-    retryChain: (chainKey: string) => Promise<void>;
+    retryChain: (chainId: number) => Promise<void>;
     dismissOnboarding: () => void;
 }
 
@@ -75,7 +76,7 @@ export const useOnboarding = () => {
 const initializeProgress = (chains: ChainConfig[]): Record<string, ChainProgress> => {
     const progress: Record<string, ChainProgress> = {};
     for (const chain of chains) {
-        progress[chain.key] = {
+        progress[chain.id] = {
             walletCreate: "idle",
             moduleSign: "idle",
             moduleEnable: "idle",
@@ -89,7 +90,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
     children,
 }) => {
     const { authenticated, ready } = usePrivy();
-    const { walletAddress, chainId, ethereumProvider, wallet: embeddedWallet } = usePrivyWallet();
+    const { walletAddress, ethereumProvider, wallet: embeddedWallet } = usePrivyWallet();
     const { getPrivyAccessToken } = usePrivyWallet();
     const { signEnableModule, submitEnableModule, createSafeWallet } = useCreateSafeWallet();
 
@@ -152,13 +153,13 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
     // Process a single chain: create wallet + switch chain + sign + enable + verify module
     const processChain = useCallback(
         async (chain: ChainConfig): Promise<boolean> => {
-            const { key } = chain;
+            const chainId = chain.id;
 
             try {
                 // Step 1: Create wallet
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], walletCreate: "pending", error: undefined },
+                    [chainId]: { ...prev[chainId], walletCreate: "pending", error: undefined },
                 }));
 
                 // Use the updated createSafeWallet hook with targetChainId
@@ -167,7 +168,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 if (!createResult.success) {
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], walletCreate: "error", error: createResult.error },
+                        [chainId]: { ...prev[chainId], walletCreate: "error", error: createResult.error },
                     }));
                     return false;
                 }
@@ -175,15 +176,15 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 const safeAddress = createResult.safeAddress!;
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], walletCreate: "success", safeAddress },
+                    [chainId]: { ...prev[chainId], walletCreate: "success", safeAddress },
                 }));
 
                 // Step 2: Switch to target chain before signing
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], moduleSign: "pending" },
+                    [chainId]: { ...prev[chainId], moduleSign: "pending" },
                 }));
-                setCurrentSigningChain(key);
+                setCurrentSigningChain(String(chainId));
 
                 try {
                     await ensureChainSelected(embeddedWallet || null, chain.id);
@@ -192,8 +193,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 } catch (switchError) {
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: {
-                            ...prev[key],
+                        [chainId]: {
+                            ...prev[chainId],
                             moduleSign: "error",
                             error: `Failed to switch to ${chain.name}: ${switchError instanceof Error ? switchError.message : String(switchError)}`,
                         },
@@ -208,7 +209,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 if (!signResult.success) {
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], moduleSign: "error", error: signResult.error },
+                        [chainId]: { ...prev[chainId], moduleSign: "error", error: signResult.error },
                     }));
                     setCurrentSigningChain(null);
                     return false;
@@ -216,7 +217,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], moduleSign: "success" },
+                    [chainId]: { ...prev[chainId], moduleSign: "success" },
                 }));
                 setCurrentSigningChain(null);
 
@@ -225,7 +226,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     // Module already enabled
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], moduleEnable: "success", moduleVerify: "success" },
+                        [chainId]: { ...prev[chainId], moduleEnable: "success", moduleVerify: "success" },
                     }));
                     return true;
                 }
@@ -233,7 +234,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 // Step 4: Submit enable module transaction
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], moduleEnable: "pending" },
+                    [chainId]: { ...prev[chainId], moduleEnable: "pending" },
                 }));
 
                 const submitResult = await submitEnableModule();
@@ -241,20 +242,20 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 if (!submitResult.success) {
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], moduleEnable: "error", error: submitResult.error },
+                        [chainId]: { ...prev[chainId], moduleEnable: "error", error: submitResult.error },
                     }));
                     return false;
                 }
 
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], moduleEnable: "success" },
+                    [chainId]: { ...prev[chainId], moduleEnable: "success" },
                 }));
 
                 // Step 5: Verify module is enabled on-chain
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: { ...prev[key], moduleVerify: "pending" },
+                    [chainId]: { ...prev[chainId], moduleVerify: "pending" },
                 }));
 
                 try {
@@ -273,8 +274,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     if (!isEnabled) {
                         setProgress((prev) => ({
                             ...prev,
-                            [key]: {
-                                ...prev[key],
+                            [chainId]: {
+                                ...prev[chainId],
                                 moduleVerify: "error",
                                 error: "Module not enabled after transaction",
                             },
@@ -284,15 +285,15 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: { ...prev[key], moduleVerify: "success" },
+                        [chainId]: { ...prev[chainId], moduleVerify: "success" },
                     }));
 
                     return true;
                 } catch (verifyError) {
                     setProgress((prev) => ({
                         ...prev,
-                        [key]: {
-                            ...prev[key],
+                        [chainId]: {
+                            ...prev[chainId],
                             moduleVerify: "error",
                             error: `Verification failed: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`,
                         },
@@ -302,8 +303,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             } catch (error) {
                 setProgress((prev) => ({
                     ...prev,
-                    [key]: {
-                        ...prev[key],
+                    [chainId]: {
+                        ...prev[chainId],
                         error: error instanceof Error ? error.message : "Unknown error",
                     },
                 }));
@@ -315,7 +316,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             signEnableModule,
             submitEnableModule,
             embeddedWallet,
-            chainId,
             ethereumProvider,
             walletAddress,
         ]
@@ -335,11 +335,14 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
                 // Check which chains need setup
                 const chainsNeedingSetup = chainsToSetup.filter((chain) => {
-                    if (chain.key === "testnet") {
+                    if (chain.id === 421614) {
                         return !user?.safe_wallet_address_testnet;
                     }
-                    if (chain.key === "mainnet") {
+                    if (chain.id === 42161) {
                         return !user?.safe_wallet_address_mainnet;
+                    }
+                    if (chain.id === 11155111) {
+                        return !user?.safe_wallet_address_eth_sepolia;
                     }
                     return true;
                 });
@@ -350,12 +353,17 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     setProgress((prev) => {
                         const updated = { ...prev };
                         for (const chain of chainsToSetup) {
-                            const hasWallet =
-                                chain.key === "testnet"
-                                    ? !!user?.safe_wallet_address_testnet
-                                    : !!user?.safe_wallet_address_mainnet;
+                            let hasWallet = false;
+                            if (chain.id === 421614) {
+                                hasWallet = !!user?.safe_wallet_address_testnet;
+                            } else if (chain.id === 42161) {
+                                hasWallet = !!user?.safe_wallet_address_mainnet;
+                            } else if (chain.id === 11155111) {
+                                hasWallet = !!user?.safe_wallet_address_eth_sepolia;
+                            }
+
                             if (hasWallet) {
-                                updated[chain.key] = {
+                                updated[chain.id] = {
                                     walletCreate: "success",
                                     moduleSign: "success",
                                     moduleEnable: "success",
@@ -387,14 +395,14 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
         // Process each chain that needs setup
         for (const chain of chainsToSetup) {
-            const chainProgress = progress[chain.key];
+            const chainProgress = progress[chain.id];
 
             // Skip if already complete (all steps success)
             if (
-                chainProgress.walletCreate === "success" &&
-                chainProgress.moduleSign === "success" &&
-                chainProgress.moduleEnable === "success" &&
-                chainProgress.moduleVerify === "success"
+                chainProgress?.walletCreate === "success" &&
+                chainProgress?.moduleSign === "success" &&
+                chainProgress?.moduleEnable === "success" &&
+                chainProgress?.moduleVerify === "success"
             ) {
                 continue;
             }
@@ -419,8 +427,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // Retry a specific chain
     const retryChain = useCallback(
-        async (chainKey: string) => {
-            const chain = chainsToSetup.find((c) => c.key === chainKey);
+        async (chainId: number) => {
+            const chain = chainsToSetup.find((c) => c.id === chainId);
             if (!chain) return;
 
             const success = await processChain(chain);
@@ -431,8 +439,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
                 // Check if all chains are now complete
                 const allComplete = chainsToSetup.every((c) => {
-                    if (c.key === chainKey) return true;
-                    const p = progress[c.key];
+                    if (c.id === chainId) return true;
+                    const p = progress[c.id];
                     return p?.moduleVerify === "success";
                 });
 
