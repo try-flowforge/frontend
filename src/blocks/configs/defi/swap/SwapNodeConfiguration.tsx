@@ -36,8 +36,11 @@ import {
     CUSTOM_TOKEN_OPTION,
 } from "@/types/swap";
 import { API_CONFIG, buildApiUrl } from "@/config/api";
+import { useWorkflow } from "@/context/WorkflowContext";
+import { useToast } from "@/context/ToastContext";
 
 interface SwapNodeConfigurationProps {
+    nodeId: string;
     nodeData: Record<string, unknown>;
     handleDataChange: (updates: Record<string, unknown>) => void;
     authenticated: boolean;
@@ -122,6 +125,7 @@ function encodeFunctionData(funcName: 'allowance' | 'approve' | 'balanceOf', arg
  * - Quote preview before execution
  */
 export function SwapNodeConfiguration({
+    nodeId,
     nodeData,
     handleDataChange,
     authenticated,
@@ -151,8 +155,13 @@ export function SwapNodeConfiguration({
     }, []);
 
     const swapChain = chainId ? getChainFromChainId(chainId) : SupportedChain.ARBITRUM;
+    const swapProvider = nodeData.swapProvider as SwapProvider || forcedProvider || SwapProvider.UNISWAP;
+
+    const { currentExecution, setCurrentExecution } = useWorkflow();
+    const { success: successToast, error: errorToast, info: infoToast } = useToast();
 
     // Local state for advanced options visibility
+    const [isSigning, setIsSigning] = useState(false);
     const [quoteState, setQuoteState] = useState<QuoteState>({
         loading: false,
         error: null,
@@ -208,13 +217,6 @@ export function SwapNodeConfiguration({
         [availableTokens, sourceTokenAddress, canUseCustomTokens]
     );
 
-    // Extract current configuration from node data
-    const swapProvider =
-        forcedProvider ||
-        (nodeData.swapProvider as SwapProvider) ||
-        SwapProvider.UNISWAP;
-
-    // Ensure forced provider is persisted into node data so future saves/loads are consistent
     React.useEffect(() => {
         if (forcedProvider && nodeData.swapProvider !== forcedProvider) {
             handleDataChange({ swapProvider: forcedProvider });
@@ -894,6 +896,163 @@ export function SwapNodeConfiguration({
         walletAddress,
     ]);
 
+    // Detect if this node is waiting for signature in an active execution
+    const pendingSignature = useMemo(() => {
+        console.log("=== pendingSignature useMemo running ===");
+        console.log("currentExecution.status:", currentExecution?.status);
+
+        if (!currentExecution) {
+            console.log("No currentExecution, returning null");
+            return null;
+        }
+
+        if (currentExecution.status !== 'WAITING_FOR_SIGNATURE') {
+            console.log("Status is NOT WAITING_FOR_SIGNATURE, actual status:", currentExecution.status);
+            return null;
+        }
+
+        // Get all node executions
+        const nodeExecutions = (currentExecution as any).nodeExecutions || (currentExecution as any).node_executions || [];
+        console.log("All node executions:", nodeExecutions);
+
+        // Find the node execution that is waiting for signature
+        // Note: Frontend uses ReactFlow IDs like "uniswap-123456" while backend uses UUIDs
+        // So we match by status instead of by ID
+        const nodeExec = nodeExecutions.find((ne: any) => ne.status === 'WAITING_FOR_SIGNATURE');
+
+        console.log("Found nodeExec with WAITING_FOR_SIGNATURE status:", nodeExec);
+        console.log("nodeExec.output_data:", nodeExec?.output_data);
+
+        if (nodeExec?.output_data?.safeTxHash) {
+            console.log("Found pending signature! safeTxHash:", nodeExec.output_data.safeTxHash);
+            return {
+                safeTxHash: nodeExec.output_data.safeTxHash as string,
+                nodeExecutionId: nodeExec.id as string
+            };
+        }
+        console.log("No pending signature found");
+        return null;
+    }, [currentExecution]);
+
+    const handleSignTransaction = async (safeTxHash: string, nodeExecutionId: string) => {
+        console.log("=== handleSignTransaction CALLED ===");
+        console.log("safeTxHash:", safeTxHash);
+        console.log("nodeExecutionId:", nodeExecutionId);
+        console.log("ethereumProvider:", ethereumProvider);
+        console.log("authenticated:", authenticated);
+
+        if (!ethereumProvider) {
+            errorToast("Wallet Not Ready", "Please ensure your wallet is connected and ready.");
+            console.error("No ethereumProvider available");
+            return;
+        }
+        if (!authenticated) {
+            errorToast("Authentication Required", "Please login to sign transactions.");
+            console.error("User not authenticated");
+            return;
+        }
+
+        setIsSigning(true);
+        infoToast("Signature Requested", "Please sign the transaction in your wallet.");
+
+        try {
+            console.log("Creating BrowserProvider...");
+            const provider = new ethers.BrowserProvider(ethereumProvider);
+            console.log("Getting signer...");
+            const signer = await provider.getSigner();
+            console.log("Signer address:", await signer.getAddress());
+
+            console.log("Signing safeTxHash:", safeTxHash);
+
+            // Reconstruct swap config for the signature request
+            const amountInWei = BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, sourceTokenDecimals)));
+            const swapConfig = {
+                sourceToken: {
+                    address: sourceTokenAddress,
+                    symbol: sourceTokenSymbol,
+                    decimals: sourceTokenDecimals,
+                },
+                destinationToken: {
+                    address: destinationTokenAddress,
+                    symbol: destinationTokenSymbol,
+                    decimals: destinationTokenDecimals,
+                },
+                amount: amountInWei.toString(),
+                swapType: SwapType.EXACT_INPUT,
+                walletAddress: walletAddress,
+            };
+
+            // Sign the hash
+            // For Safe, we sign the raw hash. signMessage prefixes with \x19Ethereum Signed Message:\n32
+            // Safe's checkSignatures expects v value to indicate signature type:
+            // - v=27/28: Standard ECDSA (used when signing the raw hash directly)
+            // - v=31/32: eth_sign signature type (used when signing with personal_sign which prefixes the message)
+            console.log("About to call signer.signMessage with bytes:", ethers.getBytes(safeTxHash));
+            let signature = await signer.signMessage(ethers.getBytes(safeTxHash));
+            console.log("signMessage returned, signature:", signature);
+
+            // Adjust v for Safe's eth_sign signature type (add +4 to indicate personal_sign was used)
+            // personal_sign prefixes the message, so Safe needs v=31 or v=32 to know to apply the same prefix when verifying
+            const vHex = signature.slice(-2);
+            const vInt = parseInt(vHex, 16);
+            let adjustedV: number;
+
+            if (vInt === 0 || vInt === 1) {
+                // Some providers return 0/1 instead of 27/28
+                adjustedV = vInt + 27 + 4; // Convert to 31 or 32
+            } else if (vInt === 27 || vInt === 28) {
+                // Standard v values, add 4 for eth_sign type
+                adjustedV = vInt + 4; // Convert to 31 or 32
+            } else {
+                // Already adjusted or unexpected value
+                adjustedV = vInt;
+            }
+
+            signature = signature.slice(0, -2) + adjustedV.toString(16).padStart(2, '0');
+
+            console.log("Signature with adjusted v for Safe eth_sign type:", signature);
+
+            const accessToken = await getPrivyAccessToken();
+            if (!accessToken) {
+                errorToast("Authentication Error", "Unable to get access token.");
+                return;
+            }
+
+            const executeUrl = `${buildApiUrl(API_CONFIG.ENDPOINTS.SWAP.EXECUTE_WITH_SIGNATURE)}/${swapProvider}/${swapChain}`;
+
+            const response = await fetch(executeUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                    nodeExecutionId,
+                    signature,
+                    config: swapConfig,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                successToast("Transaction Submitted", "The swap is now being executed on-chain.");
+                // Clear the execution state
+                if (setCurrentExecution) {
+                    setCurrentExecution(null);
+                }
+            } else {
+                console.error("Execution failed:", result.error);
+                errorToast("Execution Failed", result.error?.message || "Unknown error during execution");
+            }
+        } catch (err) {
+            console.error("Signing error:", err);
+            errorToast("Signing Error", err instanceof Error ? err.message : "Failed to sign the transaction. Please try again.");
+        } finally {
+            setIsSigning(false);
+        }
+    };
+
     // Show login prompt if not authenticated
     if (!authenticated) {
         return (
@@ -1138,27 +1297,40 @@ export function SwapNodeConfiguration({
                     </div>
 
                     <div className="space-y-3">
-                        <Button
-                            onClick={handleExecuteSwap}
-                            disabled={!quoteState.data || executionState.loading || !embeddedWallet}
-                            className="w-full gap-2"
-                        >
-                            {executionState.loading ? (
-                                <>
-                                    <LuLoader className="w-4 h-4 animate-spin" />
-                                    {executionState.step === 'checking-allowance' && 'Checking allowance...'}
-                                    {executionState.step === 'approving' && 'Approve token in wallet...'}
-                                    {executionState.step === 'waiting-approval' && 'Waiting for approval...'}
-                                    {executionState.step === 'building-tx' && 'Building transaction...'}
-                                    {executionState.step === 'swapping' && 'Confirm swap in wallet...'}
-                                </>
-                            ) : (
-                                <>
-                                    <LuPlay className="w-4 h-4" />
-                                    Execute Swap on {swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "Sepolia" : "Mainnet"}
-                                </>
-                            )}
-                        </Button>
+                        {!pendingSignature && (
+                            <Button
+                                onClick={handleExecuteSwap}
+                                disabled={!quoteState.data || executionState.loading || !embeddedWallet}
+                                className="w-full gap-2"
+                            >
+                                {executionState.loading ? (
+                                    <>
+                                        <LuLoader className="w-4 h-4 animate-spin" />
+                                        {executionState.step === 'checking-allowance' && 'Checking allowance...'}
+                                        {executionState.step === 'approving' && 'Approve token in wallet...'}
+                                        {executionState.step === 'waiting-approval' && 'Waiting for approval...'}
+                                        {executionState.step === 'building-tx' && 'Building transaction...'}
+                                        {executionState.step === 'swapping' && 'Confirm swap in wallet...'}
+                                    </>
+                                ) : (
+                                    <>
+                                        <LuPlay className="w-4 h-4" />
+                                        Execute Swap on {swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "Sepolia" : "Mainnet"}
+                                    </>
+                                )}
+                            </Button>
+                        )}
+
+                        {pendingSignature && (
+                            <Button
+                                onClick={() => handleSignTransaction(pendingSignature.safeTxHash, pendingSignature.nodeExecutionId)}
+                                disabled={isSigning}
+                                className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                            >
+                                {isSigning ? <LuLoader className="w-4 h-4 animate-spin" /> : <LuCheck className="w-4 h-4" />}
+                                {isSigning ? "Signing..." : "Sign & Execute Swap"}
+                            </Button>
+                        )}
 
                         {executionState.loading && executionState.step === 'waiting-approval' && executionState.approvalTxHash && (
                             <div className="flex items-center gap-2 p-2 rounded-md bg-muted/30 border border-white/10">
@@ -1228,6 +1400,39 @@ export function SwapNodeConfiguration({
                             </div>
                         )}
                     </div>
+                </SimpleCard>
+            )}
+
+            {/* Section 5: Pending Signature - Shows independently of quote state */}
+            {pendingSignature && (
+                <SimpleCard className="space-y-4 p-5 border-2 border-amber-500/50 bg-amber-500/10">
+                    <div className="space-y-1 mb-4">
+                        <div className="flex items-center gap-2">
+                            <LuCircleAlert className="w-5 h-5 text-amber-500" />
+                            <Typography variant="h5" className="font-semibold text-foreground">
+                                Signature Required
+                            </Typography>
+                        </div>
+                        <Typography variant="bodySmall" className="text-muted-foreground">
+                            This swap requires your signature to execute. Click the button below to sign and submit the transaction.
+                        </Typography>
+                    </div>
+
+                    <Button
+                        onClick={() => {
+                            console.log("Sign button clicked!");
+                            handleSignTransaction(pendingSignature.safeTxHash, pendingSignature.nodeExecutionId);
+                        }}
+                        disabled={isSigning}
+                        className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                        {isSigning ? <LuLoader className="w-4 h-4 animate-spin" /> : <LuCheck className="w-4 h-4" />}
+                        {isSigning ? "Signing..." : "Sign & Execute Swap"}
+                    </Button>
+
+                    <Typography variant="caption" className="text-muted-foreground block">
+                        SafeTxHash: {pendingSignature.safeTxHash.slice(0, 20)}...
+                    </Typography>
                 </SimpleCard>
             )}
         </div>

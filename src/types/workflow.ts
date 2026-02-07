@@ -119,7 +119,8 @@ export type ExecutionStatus =
     | 'SUCCESS'
     | 'FAILED'
     | 'CANCELLED'
-    | 'RETRYING';
+    | 'RETRYING'
+    | 'WAITING_FOR_SIGNATURE';
 
 export type TriggerType = 'MANUAL' | 'CRON' | 'WEBHOOK' | 'EVENT';
 

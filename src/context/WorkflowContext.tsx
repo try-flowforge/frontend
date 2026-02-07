@@ -20,6 +20,7 @@ import {
 import { getBlockById as getBlockByIdFromRegistry, getCategories } from "@/blocks/registry";
 import { generateIconRegistry } from "@/blocks/registry";
 import type { BlockDefinition } from "@/blocks/types";
+import { WorkflowExecution } from "@/types/workflow";
 import { BlockProvider, useBlock } from "@/blocks/context";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 // import { isTestnet, isMainnet, CHAIN_IDS } from "@/web3/chains";
@@ -27,7 +28,8 @@ import { SaveWorkflowModal } from "@/components/workspace/SaveWorkflowModal";
 import { useCanvasDimensions } from "@/hooks/useCanvasDimensions";
 import { useUnsavedChanges } from "@/hooks/useWorkflowState";
 import { calculateCanvasCenter } from "@/utils/canvas";
-import { saveWorkflow, saveAndExecuteWorkflow, getWorkflow, transformWorkflowToCanvas } from "../utils/workflow-api";
+import { saveWorkflow, saveAndExecuteWorkflow, getWorkflow, transformWorkflowToCanvas, getExecutionStatus } from "../utils/workflow-api";
+import { useToast } from "./ToastContext";
 import { LuSquareCheck, LuClock } from "react-icons/lu";
 
 // The Start node ID - used to identify and protect it from deletion
@@ -146,6 +148,10 @@ export interface WorkflowContextType {
   canUndo: boolean;
   canRedo: boolean;
 
+  // Workflow execution state
+  currentExecution: WorkflowExecution | null;
+  setCurrentExecution: (execution: WorkflowExecution | null) => void;
+
   // Utilities
   isProtectedNode: (nodeId: string) => boolean;
   isBlockDisabled: (blockId: string) => boolean;
@@ -189,6 +195,7 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
 
   // Workflow management state
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
+  const [currentExecution, setCurrentExecution] = useState<WorkflowExecution | null>(null);
   const [workflowVersion, setWorkflowVersion] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -313,6 +320,7 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
 
   // Get Privy access token function (must be declared before handlers that use it)
   const { getPrivyAccessToken, authenticated } = usePrivyWallet();
+  const { success: successToast, error: errorToast, info: infoToast } = useToast();
 
   const handleSave = useCallback(async () => {
     // Check if user is authenticated
@@ -402,7 +410,7 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
 
         const result = await saveAndExecuteWorkflow({
           accessToken,
-          workflowName: `Workflow ${new Date().toLocaleDateString()}`,
+          workflowName: workflowName || `Workflow ${new Date().toLocaleDateString()}`,
           nodes,
           edges,
           initialInput: {
@@ -413,34 +421,92 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
         });
 
         if (result.success) {
-          // console.log("Workflow executed successfully!", result);
-          // alert(
-          //   `Workflow executed successfully!\n\n` +
-          //   `Workflow ID: ${result.workflowId}\n` +
-          //   `Execution ID: ${result.executionId}\n` +
-          //   `Status: ${result.data?.status || "PENDING"}\n\n` +
-          //   `Check backend logs for execution trace.`
-          // );
+          successToast(
+            "Workflow started",
+            `Execution ID: ${result.executionId?.substring(0, 8)}...`
+          );
+
+          // Start monitoring the execution
+          if (result.executionId) {
+            monitorExecution(result.executionId, accessToken);
+          }
         } else {
-          // console.error("Workflow execution failed:", result.error);
-          // alert(
-          //   `Workflow execution failed!\n\n` +
-          //   `Error: ${result.error?.message || "Unknown error"}\n\n` +
-          //   `Make sure the backend is running`
-          // );
+          errorToast(
+            "Workflow execution failed",
+            result.error?.message || "Unknown error"
+          );
         }
-      } catch {
-        // console.error("Failed to execute workflow:", error);
-        // alert(
-        //   `Failed to execute workflow!\n\n` +
-        //   `Error: ${error instanceof Error ? error.message : String(error)}\n\n` +
-        //   `Is the backend running?`
-        // );
+      } catch (err) {
+        errorToast(
+          "Failed to execute workflow",
+          err instanceof Error ? err.message : String(err)
+        );
       }
     };
 
     executeWorkflowHandler();
-  }, [nodes, edges, authenticated, getPrivyAccessToken]);
+  }, [nodes, edges, workflowName, authenticated, getPrivyAccessToken, successToast, errorToast, infoToast]);
+
+  // Monitor workflow execution status
+  const monitorExecution = useCallback(async (executionId: string, accessToken: string) => {
+    let pollingCount = 0;
+    const maxPolling = 30; // Poll for 30 seconds
+    const interval = 1000; // 1 second
+
+    const poll = async () => {
+      if (pollingCount >= maxPolling) return;
+      pollingCount++;
+
+      try {
+        const statusResult = await getExecutionStatus({ executionId, accessToken });
+        if (statusResult.success && statusResult.data) {
+          const execution = statusResult.data as WorkflowExecution;
+          setCurrentExecution(execution);
+          const status = execution.status;
+
+          if (status === 'WAITING_FOR_SIGNATURE') {
+            const pendingNodeExec = execution.node_executions?.find(ne => ne.status === 'WAITING_FOR_SIGNATURE') ||
+              (execution as any).nodeExecutions?.find((ne: any) => ne.status === 'WAITING_FOR_SIGNATURE');
+
+            if (pendingNodeExec) {
+              const pendingNodeId = pendingNodeExec.node_id || pendingNodeExec.nodeId;
+              // Find the actual Node object from the nodes array
+              const nodeToSelect = nodes.find(n => n.id === pendingNodeId);
+              if (nodeToSelect) {
+                setSelectedNode(nodeToSelect);
+              }
+            }
+
+            infoToast(
+              "Signature Required",
+              "A swap node in your workflow requires your signature to proceed. Please sign the transaction in the sidebar.",
+              0 // Don't auto-dismiss
+            );
+            return; // Stop polling once we hit waiting state
+          }
+
+          if (status === 'SUCCESS') {
+            successToast("Workflow completed", "Execution finished successfully.");
+            return;
+          }
+
+          if (status === 'FAILED') {
+            errorToast("Workflow failed", statusResult.data.error?.message || "Execution failed.");
+            return;
+          }
+
+          // Continue polling if still running
+          if (status === 'RUNNING' || status === 'PENDING') {
+            setTimeout(poll, interval);
+          }
+        }
+      } catch (e) {
+        console.error("Error polling execution status:", e);
+      }
+    };
+
+    poll();
+  }, [successToast, errorToast, infoToast, nodes]);
 
   // Load workflow from backend
   const loadWorkflow = useCallback(async (workflowId: string): Promise<boolean> => {
@@ -1076,6 +1142,8 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
       // Workflow management state
       currentWorkflowId,
       setCurrentWorkflowId,
+      currentExecution,
+      setCurrentExecution,
       workflowVersion,
       isSaving,
       isLoading,
@@ -1132,6 +1200,8 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
       workflowName,
       zoomLevel,
       currentWorkflowId,
+      currentExecution,
+      setCurrentExecution,
       workflowVersion,
       isSaving,
       isLoading,
