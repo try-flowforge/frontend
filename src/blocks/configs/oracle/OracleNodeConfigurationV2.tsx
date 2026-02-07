@@ -4,6 +4,8 @@ import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { Typography } from "@/components/ui/Typography";
 import { SimpleCard } from "@/components/ui/SimpleCard";
 import { Button } from "@/components/ui/Button";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
     LuLoader,
     LuCircleAlert,
@@ -31,7 +33,7 @@ interface OracleNodeConfigurationV2Props {
     login: () => void;
 }
 
-export function OracleNodeConfigurationV2({
+function OracleNodeConfigurationV2Inner({
     nodeData,
     handleDataChange,
     authenticated,
@@ -151,6 +153,24 @@ export function OracleNodeConfigurationV2({
         return "bg-blue-500/20 text-blue-400 border-blue-500/30"; // Ethereum Sepolia
     };
 
+    // Prepare dropdown options
+    const dropdownOptions = useMemo(() => {
+        const options: { value: string; label: string; group?: string }[] = [];
+        Object.entries(groupedFeeds).forEach(([category, feeds]) => {
+            // For simplicity in Dropdown (which might not support groups directly in its interface yet based on prev usage),
+            // we flatten or just list them. If Dropdown supports groups, we'd structure accordingly.
+            // Based on previous usage, Dropdown takes a flat list. We can prefix the label.
+            (feeds as PriceFeed[]).forEach(feed => {
+                options.push({
+                    value: feed.symbol,
+                    label: `${getCategoryLabel(category as FeedCategory)}: ${feed.symbol} - ${feed.name}`
+                });
+            });
+        });
+        return options;
+    }, [groupedFeeds]);
+
+
     return (
         <div className="space-y-4">
             {/* Authentication Required */}
@@ -222,7 +242,7 @@ export function OracleNodeConfigurationV2({
                             disabled={loading}
                             className={`p-3 rounded-lg border text-left transition-all disabled:opacity-50 ${oracleChain === chain
                                 ? "border-primary bg-primary/10 text-primary"
-                                : "border-border hover:border-primary/50 text-foreground"
+                                : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-foreground"
                                 }`}
                         >
                             <div className="flex items-center justify-between">
@@ -248,30 +268,19 @@ export function OracleNodeConfigurationV2({
                 </div>
 
                 <div className="space-y-2">
-                    <label className="block">
-                        <Typography variant="caption" className="text-muted-foreground mb-1.5">
-                            Choose a price pair
-                        </Typography>
-                        <select
-                            value={selectedSymbol}
-                            onChange={(e) => handleFeedSelection(e.target.value)}
-                            disabled={loading || fetchingConfig}
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
-                        >
-                            <option value="">Select a price feed...</option>
+                    <Typography variant="caption" className="text-muted-foreground mb-1.5 block">
+                        Choose a price pair
+                    </Typography>
 
-                            {/* Group feeds by category */}
-                            {Object.entries(groupedFeeds).map(([category, feeds]) => (
-                                <optgroup key={category} label={getCategoryLabel(category as FeedCategory)}>
-                                    {(feeds as PriceFeed[]).map((feed) => (
-                                        <option key={feed.symbol} value={feed.symbol}>
-                                            {feed.symbol} - {feed.name}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
-                    </label>
+                    <Dropdown
+                        value={selectedSymbol}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        onChange={(e: any) => handleFeedSelection(e.target.value)}
+                        options={dropdownOptions}
+                        placeholder="Select a price feed..."
+                        disabled={loading || fetchingConfig}
+                        className="w-full"
+                    />
 
                     {fetchingConfig && (
                         <div className="flex items-center gap-2 text-primary">
@@ -325,7 +334,7 @@ export function OracleNodeConfigurationV2({
                             Staleness Guard (seconds)
                             <div className="group relative">
                                 <LuInfo className="w-3 h-3 cursor-help" />
-                                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-background border border-border rounded-lg shadow-lg z-10">
+                                <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-48 p-2 bg-[#1e1e1e] border border-white/20 rounded-lg shadow-lg z-10">
                                     <Typography variant="caption" className="text-muted-foreground">
                                         Reject price data older than this many seconds. Default: 3600 (1 hour)
                                     </Typography>
@@ -340,7 +349,7 @@ export function OracleNodeConfigurationV2({
                             })}
                             placeholder="3600"
                             min="0"
-                            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                         />
                         <Typography variant="caption" className="text-muted-foreground mt-1">
                             Workflow will fail if price data is older than this
@@ -373,3 +382,25 @@ export function OracleNodeConfigurationV2({
     );
 }
 
+
+export function OracleNodeConfigurationV2(props: OracleNodeConfigurationV2Props) {
+    return (
+        <ErrorBoundary
+            fallback={(error, reset) => (
+                <SimpleCard className="p-4 space-y-3">
+                    <Typography variant="bodySmall" className="font-semibold text-foreground">
+                        Oracle Configuration Error
+                    </Typography>
+                    <Typography variant="caption" className="text-destructive">
+                        {error.message}
+                    </Typography>
+                    <Button type="button" onClick={reset} className="w-full">
+                        Try Again
+                    </Button>
+                </SimpleCard>
+            )}
+        >
+            <OracleNodeConfigurationV2Inner {...props} />
+        </ErrorBoundary>
+    );
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownRight, MoveUpRight, Play } from "lucide-react";
+import { LuArrowDownRight, LuMoveUpRight, LuPlay } from "react-icons/lu";
 import { cn } from "@/lib/utils";
 import Image, { type StaticImageData } from "next/image";
 import { motion, useTransform, MotionValue } from "framer-motion";
@@ -263,7 +263,7 @@ export function FunctionalitySection({ progress }: FunctionalitySectionProps) {
           <h2 className="text-7xl md:text-9xl font-bold tracking-tight leading-none shrink-0 text-black uppercase select-none">
             {SOLUTION_STORY[0].word}
           </h2>
-          <ArrowDownRight className="w-16 h-16 md:w-36 md:h-36 text-black shrink-0 stroke-[1.5]" />
+          <LuArrowDownRight className="w-16 h-16 md:w-36 md:h-36 text-black shrink-0 stroke-[1.5]" />
           <MediaCard src={d1} alt={SOLUTION_STORY[0].imagePrompts[0]} />
           <MediaCard src={d2} alt={SOLUTION_STORY[0].imagePrompts[1]} />
           <MediaCard src={d3} alt={SOLUTION_STORY[0].imagePrompts[2]} />
@@ -326,7 +326,7 @@ export function FunctionalitySection({ progress }: FunctionalitySectionProps) {
           <h2 className="text-7xl md:text-9xl font-bold tracking-tight leading-none shrink-0 text-black uppercase select-none">
             {SOLUTION_STORY[4].word}
           </h2>
-          <Play className="w-16 h-16 md:w-32 md:h-32 text-black fill-black shrink-0 ml-2" />
+          <LuPlay className="w-16 h-16 md:w-32 md:h-32 text-black fill-black shrink-0 ml-2" />
           <MediaCard src={r5} alt={SOLUTION_STORY[4].imagePrompts[0]} />
           <MediaCard src={r6} alt={SOLUTION_STORY[4].imagePrompts[1]} />
           <MediaCard src={r1} className="md:w-[200px]" alt={SOLUTION_STORY[4].imagePrompts[2]} />
@@ -341,7 +341,7 @@ export function FunctionalitySection({ progress }: FunctionalitySectionProps) {
           <h2 className="text-7xl md:text-9xl font-bold tracking-tight leading-none shrink-0 text-black uppercase select-none">
             {SOLUTION_STORY[5].word}
           </h2>
-          <MoveUpRight className="w-16 h-16 md:w-36 md:h-36 text-black shrink-0 stroke-[1.5]" />
+          <LuMoveUpRight className="w-16 h-16 md:w-36 md:h-36 text-black shrink-0 stroke-[1.5]" />
           <MediaCard src={s2} alt={SOLUTION_STORY[5].imagePrompts[0]} />
           <MediaCard src={s4} className="md:w-[200px]" alt={SOLUTION_STORY[5].imagePrompts[1]} />
           <MediaCard src={s6} alt={SOLUTION_STORY[5].imagePrompts[2]} />

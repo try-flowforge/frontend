@@ -4,14 +4,14 @@ import React, { useState, useCallback, useMemo } from "react";
 import { Typography } from "@/components/ui/Typography";
 import { SimpleCard } from "@/components/ui/SimpleCard";
 import { Button } from "@/components/ui/Button";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
     LuLoader,
     LuRefreshCw,
     LuCircleAlert,
     LuCircleCheck,
     LuLogIn,
-    LuCopy,
-    LuCheck,
     LuExternalLink,
     LuTrendingUp,
     LuTrendingDown,
@@ -85,7 +85,7 @@ const COMPOUND_COMET_ADDRESS = '0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA';
  * 
  * Note: Lending is available on Arbitrum and Ethereum Sepolia
  */
-export function LendingNodeConfiguration({
+function LendingNodeConfigurationInner({
     nodeData,
     handleDataChange,
     authenticated,
@@ -110,7 +110,6 @@ export function LendingNodeConfiguration({
         error: null,
         data: null,
     });
-    const [copied, setCopied] = useState(false);
 
     // Extract current configuration from node data
     const lendingProvider = (nodeData.lendingProvider as LendingProvider) || LendingProvider.AAVE;
@@ -344,35 +343,22 @@ export function LendingNodeConfiguration({
         }
     }, [assetAddress, assetDecimals, effectiveWalletAddress, lendingProvider, handleDataChange, nodeData.lendingChain]);
 
-    // Handle copy to clipboard
-    const handleCopyAddress = useCallback(async () => {
-        if (!effectiveWalletAddress) return;
-
-        try {
-            await navigator.clipboard.writeText(effectiveWalletAddress);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch {
-            //Failed to copy address:
-        }
-    }, [effectiveWalletAddress]);
-
     // Get operation icon
     const getOperationIcon = (operation: LendingOperation) => {
         switch (operation) {
             case LendingOperation.SUPPLY:
-                return <LuCircleArrowUp className="w-4 h-4" />;
+                return <LuCircleArrowUp className="w-4 h-4 text-orange-500" />;
             case LendingOperation.WITHDRAW:
-                return <LuCircleArrowDown className="w-4 h-4" />;
+                return <LuCircleArrowDown className="w-4 h-4 text-orange-500" />;
             case LendingOperation.BORROW:
-                return <LuTrendingDown className="w-4 h-4" />;
+                return <LuTrendingDown className="w-4 h-4 text-orange-500" />;
             case LendingOperation.REPAY:
-                return <LuTrendingUp className="w-4 h-4" />;
+                return <LuTrendingUp className="w-4 h-4 text-orange-500" />;
             case LendingOperation.ENABLE_COLLATERAL:
             case LendingOperation.DISABLE_COLLATERAL:
-                return <LuShield className="w-4 h-4" />;
+                return <LuShield className="w-4 h-4 text-orange-500" />;
             default:
-                return <LuWallet className="w-4 h-4" />;
+                return <LuWallet className="w-4 h-4 text-orange-500" />;
         }
     };
 
@@ -415,48 +401,6 @@ export function LendingNodeConfiguration({
 
     return (
         <div className="space-y-4">
-            {/* Network Notice */}
-            <SimpleCard className="p-3 border-primary/30 bg-primary/5">
-                <div className="flex items-center gap-2">
-                    <LuShield className="w-4 h-4 text-primary" />
-                    <Typography variant="caption" className="text-primary">
-                        Lending is available on Arbitrum Mainnet and Ethereum Sepolia
-                    </Typography>
-                </div>
-            </SimpleCard>
-
-            {/* Wallet Address with Copy Button */}
-            {effectiveWalletAddress && (
-                <SimpleCard className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                            <Typography variant="caption" className="text-muted-foreground mb-1">
-                                {selectedSafe ? "Safe Wallet" : "Wallet Address"}
-                            </Typography>
-                            <div className="flex items-center gap-2">
-                                <Typography
-                                    variant="bodySmall"
-                                    className="font-mono text-foreground truncate"
-                                >
-                                    {effectiveWalletAddress}
-                                </Typography>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={handleCopyAddress}
-                            className="shrink-0 gap-1.5"
-                            title="Copy address"
-                        >
-                            {copied ? (
-                                <LuCheck className="w-3.5 h-3.5 text-success" />
-                            ) : (
-                                <LuCopy className="w-3.5 h-3.5" />
-                            )}
-                        </Button>
-                    </div>
-                </SimpleCard>
-            )}
-
             {/* Section 1: Operation Selection */}
             <SimpleCard className="p-4 space-y-3">
                 <Typography variant="bodySmall" className="font-semibold text-foreground">
@@ -469,8 +413,8 @@ export function LendingNodeConfiguration({
                             key={op}
                             onClick={() => handleOperationChange(op)}
                             className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-all ${lendingOperation === op
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border hover:border-primary/50 text-foreground"
+                                ? "border-primary/50 bg-primary/10 text-primary"
+                                : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-foreground"
                                 }`}
                         >
                             {getOperationIcon(op)}
@@ -488,19 +432,17 @@ export function LendingNodeConfiguration({
                     2. Select Asset
                 </Typography>
 
-                <select
+                <Dropdown
                     value={assetAddress}
-                    onChange={(e) => handleAssetChange(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    onChange={(e: any) => handleAssetChange(e.target.value)}
+                    options={availableTokens.map((token: LendingTokenInfo) => ({
+                        value: token.address,
+                        label: `${token.symbol} - ${token.name}`
+                    }))}
+                    placeholder="Select an asset..."
                     aria-label="Select asset"
-                >
-                    <option value="">Select an asset...</option>
-                    {availableTokens.map((token: LendingTokenInfo) => (
-                        <option key={token.address} value={token.address}>
-                            {token.symbol} - {token.name}
-                        </option>
-                    ))}
-                </select>
+                />
 
                 {assetAddress && (
                     <Typography variant="caption" className="text-muted-foreground font-mono">
@@ -524,7 +466,7 @@ export function LendingNodeConfiguration({
                             placeholder="0.00"
                             min="0"
                             step="any"
-                            className="w-full px-3 py-2 pr-16 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            className="w-full px-3 py-2.5 pr-16 text-sm border border-white/10 rounded-lg bg-white/5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
                             aria-label="Amount"
                         />
                         {assetSymbol && (
@@ -549,8 +491,8 @@ export function LendingNodeConfiguration({
                                 key={mode}
                                 onClick={() => handleInterestRateModeChange(mode)}
                                 className={`flex-1 p-3 rounded-lg border text-center transition-all ${interestRateMode === mode
-                                    ? "border-primary bg-primary/10 text-primary"
-                                    : "border-border hover:border-primary/50 text-foreground"
+                                    ? "border-primary/50 bg-primary/10 text-primary"
+                                    : "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 text-foreground"
                                     }`}
                             >
                                 <span className="text-sm font-medium">
@@ -571,7 +513,7 @@ export function LendingNodeConfiguration({
                     <Button
                         onClick={handleFetchPosition}
                         disabled={!assetAddress || !effectiveWalletAddress || positionState.loading}
-                        className="gap-1"
+                        className="gap-1 h-8"
                     >
                         {positionState.loading ? (
                             <LuLoader className="w-3 h-3 animate-spin" />
@@ -583,7 +525,7 @@ export function LendingNodeConfiguration({
                 </div>
 
                 {positionState.error && (
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive">
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
                         <LuCircleAlert className="w-4 h-4 mt-0.5 shrink-0" />
                         <Typography variant="caption">{positionState.error}</Typography>
                     </div>
@@ -607,7 +549,7 @@ export function LendingNodeConfiguration({
                                 {positionState.data.borrowed} {assetSymbol}
                             </Typography>
                         </div>
-                        <div className="p-3 rounded-lg bg-secondary/50">
+                        <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                             <Typography variant="caption" className="text-muted-foreground">
                                 Health Factor
                             </Typography>
@@ -615,7 +557,7 @@ export function LendingNodeConfiguration({
                                 {positionState.data.healthFactor}
                             </Typography>
                         </div>
-                        <div className="p-3 rounded-lg bg-secondary/50">
+                        <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                             <Typography variant="caption" className="text-muted-foreground">
                                 Collateral
                             </Typography>
@@ -637,7 +579,7 @@ export function LendingNodeConfiguration({
                         <Button
                             onClick={handleGetQuote}
                             disabled={!isValidForQuote || quoteState.loading}
-                            className="gap-1"
+                            className="gap-1 h-8"
                         >
                             {quoteState.loading ? (
                                 <LuLoader className="w-3 h-3 animate-spin" />
@@ -649,7 +591,7 @@ export function LendingNodeConfiguration({
                     </div>
 
                     {quoteState.error && (
-                        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive">
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
                             <LuCircleAlert className="w-4 h-4 mt-0.5 shrink-0" />
                             <Typography variant="caption">{quoteState.error}</Typography>
                         </div>
@@ -673,7 +615,7 @@ export function LendingNodeConfiguration({
                                     {quoteState.data.borrowAPY}%
                                 </Typography>
                             </div>
-                            <div className="p-3 rounded-lg bg-secondary/50">
+                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                                 <Typography variant="caption" className="text-muted-foreground">
                                     Gas Estimate
                                 </Typography>
@@ -681,7 +623,7 @@ export function LendingNodeConfiguration({
                                     {quoteState.data.gasEstimate}
                                 </Typography>
                             </div>
-                            <div className="p-3 rounded-lg bg-secondary/50">
+                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                                 <Typography variant="caption" className="text-muted-foreground">
                                     Health Factor
                                 </Typography>
@@ -693,7 +635,7 @@ export function LendingNodeConfiguration({
                     )}
 
                     {quoteState.data && (
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 text-success">
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20 text-success">
                             <LuCircleCheck className="w-4 h-4" />
                             <Typography variant="caption">
                                 Quote valid. Ready to execute in workflow.
@@ -727,5 +669,27 @@ export function LendingNodeConfiguration({
                 </div>
             </SimpleCard>
         </div>
+    );
+}
+
+export function LendingNodeConfiguration(props: LendingNodeConfigurationProps) {
+    return (
+        <ErrorBoundary
+            fallback={(error, reset) => (
+                <SimpleCard className="p-4 space-y-3">
+                    <Typography variant="bodySmall" className="font-semibold text-foreground">
+                        Lending Configuration Error
+                    </Typography>
+                    <Typography variant="caption" className="text-destructive">
+                        {error.message}
+                    </Typography>
+                    <Button type="button" onClick={reset} className="w-full">
+                        Try Again
+                    </Button>
+                </SimpleCard>
+            )}
+        >
+            <LendingNodeConfigurationInner {...props} />
+        </ErrorBoundary>
     );
 }

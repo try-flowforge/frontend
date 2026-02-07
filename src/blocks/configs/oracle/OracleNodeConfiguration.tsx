@@ -3,18 +3,17 @@ import React, { useState, useCallback, useMemo } from "react";
 import { Typography } from "@/components/ui/Typography";
 import { SimpleCard } from "@/components/ui/SimpleCard";
 import { Button } from "@/components/ui/Button";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
     LuCircleAlert,
     LuCircleCheck,
     LuExternalLink,
     LuCopy,
     LuCheck,
-    LuInfo,
     LuNetwork,
-    LuDatabase,
     LuSettings2,
     LuChevronRight,
-    LuSparkles,
 } from "react-icons/lu";
 import {
     OracleProvider,
@@ -35,7 +34,7 @@ interface OracleNodeConfigurationProps {
     login: () => void;
 }
 
-export function OracleNodeConfiguration({
+function OracleNodeConfigurationInner({
     nodeData,
     handleDataChange,
     authenticated,
@@ -50,7 +49,7 @@ export function OracleNodeConfiguration({
     const priceFeedId = (nodeData.priceFeedId as string) || "";
     const selectedPriceFeed = (nodeData.selectedPriceFeed as string) || "";
     const staleAfterSeconds = nodeData.staleAfterSeconds as number | undefined;
-    const simulateFirst = nodeData.simulateFirst !== false;
+    // const simulateFirst = nodeData.simulateFirst !== false;
 
     const isChainlink = oracleProvider === OracleProvider.CHAINLINK;
     const isPyth = oracleProvider === OracleProvider.PYTH;
@@ -137,25 +136,6 @@ export function OracleNodeConfiguration({
                         </div>
                     </SimpleCard>
                 )}
-
-                <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2.5 relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <LuInfo className="w-12 h-12" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/10 border border-blue-500/20">
-                            <LuSparkles className="w-3.5 h-3.5 text-blue-400" />
-                        </div>
-                        <Typography variant="bodySmall" className="font-bold tracking-tight text-foreground">
-                            {isChainlink ? "Chainlink" : "Pyth"} Oracle
-                        </Typography>
-                    </div>
-                    <Typography variant="caption" className="text-muted-foreground block leading-relaxed max-w-sm">
-                        {isChainlink
-                            ? "Access decentralized price feeds and off-chain data via Chainlink's industry-standard infrastructure."
-                            : "Low-latency, high-fidelity financial market data delivered directly from the Pyth Network."}
-                    </Typography>
-                </div>
             </div>
 
             {/* Step 1: Network Selection */}
@@ -179,14 +159,14 @@ export function OracleNodeConfiguration({
                                 className={cn(
                                     "group relative flex items-center justify-between p-3.5 rounded-xl border transition-all text-left",
                                     isSelected
-                                        ? "bg-blue-500/5 border-blue-500/40 text-blue-400 shadow-[0_0_15px_-3px_rgba(59,130,246,0.1)]"
+                                        ? "bg-grey/10 border-white/50 text-foreground shadow-[0_0_15px_-3px_rgba(59,130,246,0.1)]"
                                         : "bg-white/5 border-white/10 text-white/50 hover:bg-white/[0.07] hover:border-white/20"
                                 )}
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={cn(
                                         "flex h-8 w-8 items-center justify-center rounded-lg border transition-colors",
-                                        isSelected ? "bg-blue-500/20 border-blue-500/30 text-blue-400" : "bg-zinc-900 border-white/5 text-white/20"
+                                        isSelected ? "bg-orange-500/20 border-orange-500/30 text-[#FF6500]" : "bg-white/5 border-white/10 text-white/20"
                                     )}>
                                         <LuNetwork className="w-4 h-4" />
                                     </div>
@@ -220,18 +200,17 @@ export function OracleNodeConfiguration({
                                 Preset Feeds
                             </Typography>
                         </div>
-                        <select
+                        <Dropdown
                             value={selectedPriceFeed}
-                            onChange={(e) => handlePriceFeedPreset(e.target.value)}
-                            className="w-full h-11 px-4 bg-zinc-900/50 border border-white/10 rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 transition-all appearance-none cursor-pointer"
-                        >
-                            <option value="">Select a feed...</option>
-                            {availablePriceFeeds.map((feed) => (
-                                <option key={feed.symbol} value={feed.symbol}>
-                                    {feed.symbol} — {feed.description}
-                                </option>
-                            ))}
-                        </select>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            onChange={(e: any) => handlePriceFeedPreset(e.target.value)}
+                            options={availablePriceFeeds.map((feed) => ({
+                                value: feed.symbol,
+                                label: `${feed.symbol} — ${feed.description}`
+                            }))}
+                            placeholder="Select a feed..."
+                            className="w-full"
+                        />
                     </div>
 
                     <div className="h-px bg-white/5 w-full" />
@@ -249,7 +228,7 @@ export function OracleNodeConfiguration({
                                 onChange={(e) => handleDataChange(isChainlink ? { aggregatorAddress: e.target.value } : { priceFeedId: e.target.value })}
                                 placeholder={isChainlink ? "0x000...000" : "0x000...000"}
                                 className={cn(
-                                    "w-full h-11 px-4 pr-11 bg-zinc-900/50 border rounded-xl text-sm font-mono text-foreground focus:outline-none focus:ring-2 transition-all",
+                                    "w-full h-11 px-4 pr-11 bg-zinc-900/50 border rounded-xl text-sm font-mono text-foreground focus:outline-none focus:ring-2 transition-all appearance-none",
                                     (isChainlink ? addressError : feedIdError)
                                         ? "border-red-500/50 focus:ring-red-500/10"
                                         : "border-white/10 focus:ring-blue-500/10 focus:border-blue-500/40"
@@ -279,11 +258,11 @@ export function OracleNodeConfiguration({
 
                         {isPyth && (
                             <div className="flex items-center gap-2 px-1 py-1">
-                                <div className="h-4 w-4 shrink-0 flex items-center justify-center rounded-full bg-blue-500/10">
-                                    <LuExternalLink className="w-2.5 h-2.5 text-blue-400" />
+                                <div className="h-4 w-4 shrink-0 flex items-center justify-center rounded-full bg-orange-500/10">
+                                    <LuExternalLink className="w-2.5 h-2.5 text-orange-400" />
                                 </div>
                                 <Typography variant="caption" className="text-muted-foreground">
-                                    Find IDs at <a href="https://pyth.network/developers/price-feed-ids" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">pyth.network</a>
+                                    Find IDs at <a href="https://pyth.network/developers/price-feed-ids" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:underline">pyth.network</a>
                                 </Typography>
                             </div>
                         )}
@@ -327,38 +306,6 @@ export function OracleNodeConfiguration({
                             Maximum data age (in seconds) before the workflow rejects the price feed.
                         </Typography>
                     </div>
-
-                    <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleDataChange({ simulateFirst: !simulateFirst })}
-                        className={cn(
-                            "flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer select-none",
-                            simulateFirst ? "bg-blue-500/5 border-blue-500/20" : "bg-black/20 border-white/5 hover:border-white/10"
-                        )}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className={cn(
-                                "flex h-8 w-8 items-center justify-center rounded-lg border",
-                                simulateFirst ? "bg-blue-500/20 border-blue-500/30 text-blue-400" : "bg-zinc-900 border-white/5 text-white/20"
-                            )}>
-                                <LuDatabase className="w-4 h-4" />
-                            </div>
-                            <div className="space-y-0.5">
-                                <Typography variant="caption" className="font-bold text-foreground block">Simulate Execution</Typography>
-                                <Typography variant="caption" className="text-muted-foreground block text-[10px]">Verify feed status before run</Typography>
-                            </div>
-                        </div>
-                        <div className={cn(
-                            "w-10 h-5 rounded-full relative transition-colors",
-                            simulateFirst ? "bg-blue-500" : "bg-zinc-800"
-                        )}>
-                            <div className={cn(
-                                "absolute top-1 w-3 h-3 rounded-full bg-white transition-all shadow-sm",
-                                simulateFirst ? "left-6" : "left-1"
-                            )} />
-                        </div>
-                    </div>
                 </div>
             </SimpleCard>
 
@@ -380,16 +327,31 @@ export function OracleNodeConfiguration({
                         <Typography variant="bodySmall" className="font-bold block">
                             {isConfigValid ? "Oracle Fully Configured" : "Configuration Incomplete"}
                         </Typography>
-                        <Typography variant="caption" className="opacity-80 block leading-tight mt-0.5">
-                            {isConfigValid
-                                ? "Blockchain connection and price feed parameters are validated."
-                                : isChainlink
-                                    ? "Please provide a valid contract address to proceed."
-                                    : "Please provide a valid feed ID to proceed."}
-                        </Typography>
                     </div>
                 </div>
             </div>
         </div>
+    );
+}
+
+export function OracleNodeConfiguration(props: OracleNodeConfigurationProps) {
+    return (
+        <ErrorBoundary
+            fallback={(error, reset) => (
+                <SimpleCard className="p-4 space-y-3">
+                    <Typography variant="bodySmall" className="font-semibold text-foreground">
+                        Oracle Configuration Error
+                    </Typography>
+                    <Typography variant="caption" className="text-destructive">
+                        {error.message}
+                    </Typography>
+                    <Button type="button" onClick={reset} className="w-full">
+                        Try Again
+                    </Button>
+                </SimpleCard>
+            )}
+        >
+            <OracleNodeConfigurationInner {...props} />
+        </ErrorBoundary>
     );
 }
