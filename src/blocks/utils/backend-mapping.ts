@@ -57,6 +57,7 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
         // Ensure provider is always persisted; LI.FI blocks should never fall back to UNISWAP.
         provider: data.swapProvider || (type === "lifi" ? "LIFI" : undefined),
         chain: data.swapChain,
+        ...(data.swapToChain != null && data.swapToChain !== "" && { toChain: data.swapToChain }),
         inputConfig: {
           sourceToken: {
             address: data.sourceTokenAddress,
@@ -71,6 +72,7 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
           amount: data.swapAmount,
           swapType: data.swapType || "EXACT_INPUT",
           walletAddress: data.walletAddress,
+          ...(data.swapToChain != null && data.swapToChain !== "" && { toChain: data.swapToChain }),
         },
         simulateFirst: data.simulateFirst ?? true,
         autoRetryOnFailure: data.autoRetryOnFailure ?? true,

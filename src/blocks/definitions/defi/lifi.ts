@@ -29,6 +29,7 @@ export const lifiBlock: BlockDefinition = {
         // Fixed provider for this block
         swapProvider: SwapProvider.LIFI,
         swapChain: SupportedChain.ARBITRUM,
+        swapToChain: SupportedChain.BASE,
         swapType: SwapType.EXACT_INPUT,
         // Source token
         sourceTokenAddress: "",

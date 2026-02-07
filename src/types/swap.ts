@@ -8,6 +8,7 @@ export enum SupportedChain {
     ARBITRUM = 'ARBITRUM',
     ARBITRUM_SEPOLIA = 'ARBITRUM_SEPOLIA',
     ETHEREUM_SEPOLIA = 'ETHEREUM_SEPOLIA',
+    BASE = 'BASE',
 }
 
 // Supported Swap Providers
@@ -41,6 +42,9 @@ export interface SwapInputConfig {
     swapType: SwapType;
     walletAddress: string; // The wallet that will perform the swap
 
+    // Optional: destination chain for cross-chain (e.g. LiFi)
+    toChain?: SupportedChain;
+
     // Optional fields with defaults
     slippageTolerance?: number; // Default: 0.5 (0.5%) - backend uses default if not provided
     deadline?: number; // Unix timestamp, default: 20 minutes from now
@@ -61,6 +65,9 @@ export interface SwapNodeConfig {
     provider: SwapProvider;
     chain: SupportedChain;
     inputConfig: SwapInputConfig;
+
+    // Optional: destination chain for cross-chain (e.g. LiFi)
+    toChain?: SupportedChain;
 
     // Execution preferences
     simulateFirst?: boolean; // Default: true
@@ -183,6 +190,36 @@ export const ARBITRUM_SEPOLIA_TOKENS: TokenInfo[] = [
 ];
 
 /**
+ * Base Mainnet Tokens (for LiFi cross-chain)
+ */
+export const BASE_MAINNET_TOKENS: TokenInfo[] = [
+    {
+        address: '0x4200000000000000000000000000000000000006',
+        symbol: 'WETH',
+        decimals: 18,
+        name: 'Wrapped Ether',
+    },
+    {
+        address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        symbol: 'USDC',
+        decimals: 6,
+        name: 'USD Coin',
+    },
+    {
+        address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
+        symbol: 'DAI',
+        decimals: 18,
+        name: 'Dai Stablecoin',
+    },
+    {
+        address: '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA',
+        symbol: 'USDbC',
+        decimals: 6,
+        name: 'USD Base Coin',
+    },
+];
+
+/**
  * Legacy export for backward compatibility
  * @deprecated Use getTokensForChain() instead
  */
@@ -206,6 +243,8 @@ export function getTokensForChain(chain: SupportedChain): TokenInfo[] {
             return ARBITRUM_SEPOLIA_TOKENS;
         case SupportedChain.ETHEREUM_SEPOLIA:
             return ETHEREUM_SEPOLIA_TOKENS;
+        case SupportedChain.BASE:
+            return BASE_MAINNET_TOKENS;
         default:
             return ARBITRUM_MAINNET_TOKENS;
     }
@@ -225,10 +264,12 @@ export const CHAIN_LABELS: Record<SupportedChain, string> = {
     [SupportedChain.ARBITRUM]: 'Arbitrum',
     [SupportedChain.ARBITRUM_SEPOLIA]: 'Arbitrum Sepolia',
     [SupportedChain.ETHEREUM_SEPOLIA]: 'Ethereum Sepolia',
+    [SupportedChain.BASE]: 'Base',
 };
 
 export const PROVIDER_LABELS: Record<SwapProvider, string> = {
     [SwapProvider.UNISWAP]: 'Uniswap',
+    [SwapProvider.UNISWAP_V4]: 'Uniswap V4',
     [SwapProvider.RELAY]: 'Relay',
     [SwapProvider.ONEINCH]: '1inch',
     [SwapProvider.LIFI]: 'LI.FI',

@@ -34,6 +34,7 @@ import {
     getTokensForChain,
     allowsCustomTokens,
     CUSTOM_TOKEN_OPTION,
+    CHAIN_LABELS,
 } from "@/types/swap";
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 
@@ -63,6 +64,9 @@ interface ExecutionState {
     success: boolean;
     step: 'idle' | 'checking-allowance' | 'approving' | 'waiting-approval' | 'building-tx' | 'swapping' | 'done';
 }
+
+// Chains available for LiFi (same-chain or cross-chain Arbitrum ↔ Base)
+const LIFI_CHAINS: SupportedChain[] = [SupportedChain.ARBITRUM, SupportedChain.BASE];
 
 // Static constants moved outside component to prevent recreation and fix useCallback deps
 const UNISWAP_ROUTER_ADDRESSES: Record<SupportedChain, string> = {
@@ -138,19 +142,30 @@ export function SwapNodeConfiguration({
     // Get access token for authenticated API calls
     const { getPrivyAccessToken, chainId, ethereumProvider } = usePrivyWallet();
 
-    // Convert chainId to SupportedChain enum
-    const getChainFromChainId = useCallback((chainId: number | null): SupportedChain => {
-        if (chainId === CHAIN_IDS.ETHEREUM_SEPOLIA) {
-            return SupportedChain.ETHEREUM_SEPOLIA;
-        }
-        if (chainId === CHAIN_IDS.ARBITRUM_SEPOLIA) {
-            return SupportedChain.ARBITRUM_SEPOLIA;
-        }
-        // Default to Arbitrum mainnet
+    // Extract current configuration from node data (needed early for isLiFi / chain logic)
+    const swapProvider =
+        forcedProvider ||
+        (nodeData.swapProvider as SwapProvider) ||
+        SwapProvider.UNISWAP;
+
+    // Convert chainId to SupportedChain enum (Base 8453 used for LiFi block only)
+    const getChainFromChainId = useCallback((cid: number | null): SupportedChain => {
+        if (cid === CHAIN_IDS.ETHEREUM_SEPOLIA) return SupportedChain.ETHEREUM_SEPOLIA;
+        if (cid === CHAIN_IDS.ARBITRUM_SEPOLIA) return SupportedChain.ARBITRUM_SEPOLIA;
+        if (cid === 8453) return SupportedChain.BASE;
         return SupportedChain.ARBITRUM;
     }, []);
 
-    const swapChain = chainId ? getChainFromChainId(chainId) : SupportedChain.ARBITRUM;
+    const isLiFi = swapProvider === SwapProvider.LIFI;
+
+    // For LiFi: from/to chain from node config (user selects in UI). For other providers: chain from wallet.
+    const swapChain: SupportedChain = isLiFi
+        ? ((nodeData.swapChain as SupportedChain) || SupportedChain.ARBITRUM)
+        : (chainId ? getChainFromChainId(chainId) : SupportedChain.ARBITRUM);
+
+    const swapToChain: SupportedChain | undefined = isLiFi
+        ? (nodeData.swapToChain as SupportedChain | undefined)
+        : undefined;
 
     // Local state for advanced options visibility
     const [quoteState, setQuoteState] = useState<QuoteState>({
@@ -176,12 +191,18 @@ export function SwapNodeConfiguration({
     const [customTokenLoading, setCustomTokenLoading] = useState(false);
     const [customTokenError, setCustomTokenError] = useState<string | null>(null);
 
-    // Get available tokens based on current chain
+    // Source chain tokens (from-chain for LiFi, swapChain for others)
     const availableTokens = useMemo(() => {
         return getTokensForChain(swapChain);
     }, [swapChain]);
 
-    // Check if custom token input is allowed
+    // Destination chain tokens (to-chain for LiFi when cross-chain, else same as source)
+    const destChainTokens = useMemo(() => {
+        const chain = isLiFi && swapToChain ? swapToChain : swapChain;
+        return getTokensForChain(chain);
+    }, [isLiFi, swapToChain, swapChain]);
+
+    // Check if custom token input is allowed (per chain)
     const canUseCustomTokens = useMemo(() => {
         return allowsCustomTokens(swapChain);
     }, [swapChain]);
@@ -200,19 +221,13 @@ export function SwapNodeConfiguration({
     const destTokenOptions = useMemo(
         () => [
             { value: "", label: "Select token..." },
-            ...availableTokens
+            ...destChainTokens
                 .filter((t: TokenInfo) => t.address !== sourceTokenAddress)
                 .map((t: TokenInfo) => ({ value: t.address, label: t.symbol ?? t.address })),
             ...(canUseCustomTokens ? [{ value: CUSTOM_TOKEN_OPTION, label: "+ Custom..." }] : []),
         ],
-        [availableTokens, sourceTokenAddress, canUseCustomTokens]
+        [destChainTokens, sourceTokenAddress, canUseCustomTokens]
     );
-
-    // Extract current configuration from node data
-    const swapProvider =
-        forcedProvider ||
-        (nodeData.swapProvider as SwapProvider) ||
-        SwapProvider.UNISWAP;
 
     // Ensure forced provider is persisted into node data so future saves/loads are consistent
     React.useEffect(() => {
@@ -248,8 +263,8 @@ export function SwapNodeConfiguration({
             updates.walletAddress = effectiveWalletAddress;
         }
 
-        // Update chain from user menu - also reset tokens if switching chains
-        if (swapChain !== nodeData.swapChain) {
+        // Update chain from user menu only for non-LiFi (LiFi uses configurable From/To chain in UI)
+        if (!isLiFi && swapChain !== nodeData.swapChain) {
             updates.swapChain = swapChain;
             // Reset token selection when chain changes since addresses differ
             updates.sourceTokenAddress = "";
@@ -268,7 +283,7 @@ export function SwapNodeConfiguration({
             handleDataChange(updates);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [effectiveWalletAddress, swapChain]);
+    }, [effectiveWalletAddress, swapChain, isLiFi]);
 
     // Fetch token info from chain (for custom token input)
     const fetchTokenInfo = useCallback(async (address: string, isSource: boolean) => {
@@ -280,10 +295,11 @@ export function SwapNodeConfiguration({
         setCustomTokenLoading(true);
         setCustomTokenError(null);
 
+        const chainForToken = isSource ? swapChain : (swapToChain ?? swapChain);
         try {
             // Call backend to fetch token info from chain
             const response = await fetch(
-                `${buildApiUrl(API_CONFIG.ENDPOINTS.SWAP.PROVIDERS)}/${swapChain}/token/${address}`
+                `${buildApiUrl(API_CONFIG.ENDPOINTS.SWAP.PROVIDERS)}/${chainForToken}/token/${address}`
             );
 
             if (!response.ok) {
@@ -345,7 +361,7 @@ export function SwapNodeConfiguration({
         } finally {
             setCustomTokenLoading(false);
         }
-    }, [swapChain, handleDataChange]);
+    }, [swapChain, swapToChain, handleDataChange]);
 
     // Handle token selection from dropdown
     const handleSourceTokenChange = useCallback((tokenAddress: string) => {
@@ -383,7 +399,7 @@ export function SwapNodeConfiguration({
             return;
         }
 
-        const token = availableTokens.find((t: TokenInfo) => t.address === tokenAddress);
+        const token = destChainTokens.find((t: TokenInfo) => t.address === tokenAddress);
         if (token) {
             handleDataChange({
                 destinationTokenAddress: token.address,
@@ -400,7 +416,7 @@ export function SwapNodeConfiguration({
             });
         }
         setShowCustomDestToken(false);
-    }, [handleDataChange, availableTokens]);
+    }, [handleDataChange, destChainTokens]);
 
 
 
@@ -440,7 +456,7 @@ export function SwapNodeConfiguration({
                 amount: amountInWei,
                 swapType: SwapType.EXACT_INPUT,
                 walletAddress: effectiveWalletAddress,
-                // Omit slippageTolerance - backend will use default
+                ...(isLiFi && swapToChain && swapToChain !== swapChain && { toChain: swapToChain }),
             };
 
             const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.SWAP.QUOTE)}/${swapProvider}/${swapChain}`;
@@ -507,6 +523,8 @@ export function SwapNodeConfiguration({
         effectiveWalletAddress,
         swapProvider,
         swapChain,
+        swapToChain,
+        isLiFi,
         handleDataChange,
     ]);
 
@@ -543,6 +561,7 @@ export function SwapNodeConfiguration({
                     amount: amountInWei.toString(),
                     swapType: SwapType.EXACT_INPUT,
                     walletAddress: walletAddress, // User's EOA wallet (for identification)
+                    ...(isLiFi && swapToChain && swapToChain !== swapChain && { toChain: swapToChain }),
                 };
 
                 // Step 1: Build Safe transaction hash
@@ -807,6 +826,7 @@ export function SwapNodeConfiguration({
                 swapType: SwapType.EXACT_INPUT,
                 walletAddress: effectiveWalletAddress,
                 simulateFirst: false, // Skip simulation since we've handled approval
+                ...(isLiFi && swapToChain && swapToChain !== swapChain && { toChain: swapToChain }),
             };
 
             const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.SWAP.BUILD_TRANSACTION)}/${swapProvider}/${swapChain}`;
@@ -885,6 +905,8 @@ export function SwapNodeConfiguration({
         effectiveWalletAddress,
         swapProvider,
         swapChain,
+        swapToChain,
+        isLiFi,
         embeddedWallet,
         handleDataChange,
         selectedSafe,
@@ -925,15 +947,80 @@ export function SwapNodeConfiguration({
 
     return (
         <div className="space-y-4">
+            {/* LiFi: From chain / To chain */}
+            {isLiFi && (
+                <SimpleCard className="p-5">
+                    <Typography variant="h5" className="font-semibold text-foreground mb-4">
+                        Chains
+                    </Typography>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Typography variant="caption" className="text-muted-foreground block mb-2 font-medium">
+                                From chain
+                            </Typography>
+                            <Dropdown
+                                value={swapChain}
+                                onChange={(e) => {
+                                    const next = e.target.value as SupportedChain;
+                                    handleDataChange({
+                                        swapChain: next,
+                                        sourceTokenAddress: "",
+                                        sourceTokenSymbol: "",
+                                        sourceTokenDecimals: 18,
+                                        destinationTokenAddress: "",
+                                        destinationTokenSymbol: "",
+                                        destinationTokenDecimals: 18,
+                                        hasQuote: false,
+                                    });
+                                }}
+                                options={LIFI_CHAINS.map((c) => ({ value: c, label: CHAIN_LABELS[c] }))}
+                                placeholder="From"
+                            />
+                        </div>
+                        <div>
+                            <Typography variant="caption" className="text-muted-foreground block mb-2 font-medium">
+                                To chain
+                            </Typography>
+                            <Dropdown
+                                value={swapToChain ?? "__SAME__"}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    const next = raw === "__SAME__" ? undefined : (raw as SupportedChain);
+                                    handleDataChange({
+                                        swapToChain: next,
+                                        destinationTokenAddress: "",
+                                        destinationTokenSymbol: "",
+                                        destinationTokenDecimals: 18,
+                                        hasQuote: false,
+                                    });
+                                }}
+                                options={[
+                                    { value: "__SAME__", label: "Same as from" },
+                                    ...LIFI_CHAINS.map((c) => ({ value: c, label: CHAIN_LABELS[c] })),
+                                ]}
+                                placeholder="To"
+                            />
+                        </div>
+                    </div>
+                </SimpleCard>
+            )}
+
             {/* Section 1: Token Selection — swap-style layout */}
             <SimpleCard className="p-5">
                 <div className="flex items-center justify-between gap-3 mb-4">
                     <Typography variant="h5" className="font-semibold text-foreground">
-                        1. Select Tokens
+                        {isLiFi ? "1. Select Tokens" : "1. Select Tokens"}
                     </Typography>
-                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"}`}>
-                        {swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "Testnet" : "Mainnet"}
-                    </span>
+                    {!isLiFi && (
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "bg-amber-500/15 text-amber-400" : "bg-emerald-500/15 text-emerald-400"}`}>
+                            {swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "Testnet" : "Mainnet"}
+                        </span>
+                    )}
+                    {isLiFi && (
+                        <span className="text-xs font-medium px-2.5 py-1 rounded-full shrink-0 bg-white/10 text-foreground">
+                            {CHAIN_LABELS[swapChain]} → {swapToChain ? CHAIN_LABELS[swapToChain] : CHAIN_LABELS[swapChain]}
+                        </span>
+                    )}
                 </div>
 
                 <div className="flex flex-col gap-0">
@@ -1172,7 +1259,7 @@ export function SwapNodeConfiguration({
                                             {executionState.approvalTxHash}
                                         </Typography>
                                         <a
-                                            href={`https://${swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "sepolia." : ""}arbiscan.io/tx/${executionState.approvalTxHash}`}
+                                            href={swapChain === SupportedChain.BASE ? `https://basescan.org/tx/${executionState.approvalTxHash}` : `https://${swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "sepolia." : ""}arbiscan.io/tx/${executionState.approvalTxHash}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-amber-500 hover:text-amber-400 flex items-center gap-1 shrink-0"
@@ -1216,7 +1303,7 @@ export function SwapNodeConfiguration({
                                         {executionState.txHash}
                                     </Typography>
                                     <a
-                                        href={`https://${swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "sepolia." : ""}arbiscan.io/tx/${executionState.txHash}`}
+                                        href={swapChain === SupportedChain.BASE ? `https://basescan.org/tx/${executionState.txHash}` : `https://${swapChain === SupportedChain.ARBITRUM_SEPOLIA ? "sepolia." : ""}arbiscan.io/tx/${executionState.txHash}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-amber-500 hover:text-amber-400 flex items-center gap-1"
