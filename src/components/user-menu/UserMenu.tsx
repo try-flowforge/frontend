@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { usePrivy } from '@privy-io/react-auth';
 import { usePrivyWallet } from '@/hooks/usePrivyWallet';
+import { useEnsSubdomain } from '@/hooks/useEnsSubdomain';
 import { CHAIN_IDS, USE_TESTNET_ONLY } from '@/web3/chains';
 import { Avatar } from './Avatar';
+import { ClaimEnsSubdomainModal } from '../ens/ClaimEnsSubdomainModal';
 import { Switch } from './Switch';
 import { CopyButton } from '../ui/CopyButton';
 import { generateAvatarGradient } from './avatar-generator';
@@ -14,7 +16,7 @@ import {
 } from 'react-icons/hi';
 import { BiLinkExternal } from 'react-icons/bi';
 import { LuLogOut } from 'react-icons/lu';
-import { TbLayoutGrid } from 'react-icons/tb';
+import { TbLayoutGrid, TbWorld } from 'react-icons/tb';
 import { FaEye } from "react-icons/fa6";
 // import { TfiCreditCard } from 'react-icons/tfi';
 import { BiLink } from "react-icons/bi";
@@ -28,13 +30,16 @@ interface UserProfile {
   safe_wallet_address_testnet: string | null;
   safe_wallet_address_mainnet: string | null;
   safe_wallet_address_eth_sepolia: string | null;
+  remaining_sponsored_txs?: number;
 }
 
 export function UserMenu() {
   const { user, logout } = usePrivy();
   const { wallet: embeddedWallet, chainId, walletAddress, getPrivyAccessToken } = usePrivyWallet();
+  const { subdomains, listSubdomains, loading: ensLoading } = useEnsSubdomain();
   const [isOpen, setIsOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [claimEnsOpen, setClaimEnsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Network configurations
@@ -82,12 +87,15 @@ export function UserMenu() {
     }
   }, [getPrivyAccessToken]);
 
-  // Only fetch profile when user has a linked wallet (backend returns 401 otherwise)
+  // Only fetch profile and subdomains when user has a linked wallet (backend returns 401 otherwise)
   useEffect(() => {
     if (isOpen && walletAddress) {
       fetchProfile();
+      getPrivyAccessToken().then((token) => {
+        if (token) listSubdomains(token);
+      });
     }
-  }, [isOpen, walletAddress, fetchProfile]);
+  }, [isOpen, walletAddress, fetchProfile, getPrivyAccessToken, listSubdomains]);
 
   // Early return AFTER all hooks
   if (!email) return null;
@@ -137,15 +145,44 @@ export function UserMenu() {
                 </div>
               </div>
 
-              {/* Get a Plan Button */}
-              {/* <Button
-                onClick={() => { }}
-                className="w-full"
+              {/* Sponsored txs (mainnet) */}
+              {typeof profile?.remaining_sponsored_txs === 'number' && (
+                <div className="w-full px-3 py-2 rounded-lg bg-white/10 text-sm text-white/80">
+                  <span className="text-white/50">Sponsored txs (mainnet): </span>
+                  <span className="font-medium">{profile.remaining_sponsored_txs}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ENS subdomains & Claim */}
+          <div className="py-2 border-t border-white/20">
+            <div className="px-4 py-2 flex items-center gap-2">
+              <TbWorld className="shrink-0 w-4 h-4 text-white/30" />
+              <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">ENS</span>
+            </div>
+            {ensLoading ? (
+              <div className="px-4 py-2 text-xs text-white/50">Loading…</div>
+            ) : subdomains.length > 0 ? (
+              <div className="px-4 py-2 space-y-1">
+                {subdomains.slice(0, 3).map((s) => (
+                  <div key={s.id} className="text-xs text-white/70 truncate" title={s.ens_name}>
+                    {s.active ? (
+                      <span className="text-green-400/90">{s.ens_name}</span>
+                    ) : (
+                      <span className="text-white/50">{s.ens_name} (expired)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="px-2 pt-1">
+              <Button
+                onClick={() => { setClaimEnsOpen(true); setIsOpen(false); }}
+                className="w-full text-sm"
               >
-                <span className="flex items-center justify-center gap-2">
-                  Get a plan
-                </span>
-              </Button> */}
+                Claim subdomain
+              </Button>
             </div>
           </div>
 
@@ -314,6 +351,17 @@ export function UserMenu() {
           </div>
         </div>
       )}
+
+      <ClaimEnsSubdomainModal
+        open={claimEnsOpen}
+        onClose={() => setClaimEnsOpen(false)}
+        onSuccess={() => {
+          getPrivyAccessToken().then((token) => {
+            if (token) listSubdomains(token);
+          });
+          fetchProfile();
+        }}
+      />
     </div>
   );
 }

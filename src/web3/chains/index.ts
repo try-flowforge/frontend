@@ -1,6 +1,8 @@
 /**
  * Centralized blockchain chain configuration and helpers.
  * All chain-specific values should live here to keep them in sync.
+ * Safe addresses: per-chain env (e.g. NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_11155111)
+ * falls back to single NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS / NEXT_PUBLIC_SAFE_MODULE_ADDRESS.
  */
 
 import { arbitrum, arbitrumSepolia, sepolia } from "viem/chains";
@@ -23,6 +25,21 @@ export type ChainDefinition = {
   readonly safeModuleAddress: string;
 };
 
+function getSafeFactoryForChain(chainId: number): string {
+  return (
+    process.env[`NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_${chainId}`] ||
+    process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS ||
+    ""
+  );
+}
+function getSafeModuleForChain(chainId: number): string {
+  return (
+    process.env[`NEXT_PUBLIC_SAFE_MODULE_ADDRESS_${chainId}`] ||
+    process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS ||
+    ""
+  );
+}
+
 // Chain definitions with readonly properties
 const chainDefinitions: Readonly<Record<SupportedChainId, ChainDefinition>> = {
   [CHAIN_IDS.ETHEREUM_SEPOLIA]: {
@@ -31,9 +48,8 @@ const chainDefinitions: Readonly<Record<SupportedChainId, ChainDefinition>> = {
     name: "Ethereum Sepolia",
     explorerUrl: "https://sepolia.etherscan.io",
     isTestnet: true,
-    safeWalletFactoryAddress:
-      process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_11155111!,
-    safeModuleAddress: process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS_11155111!,
+    safeWalletFactoryAddress: getSafeFactoryForChain(CHAIN_IDS.ETHEREUM_SEPOLIA),
+    safeModuleAddress: getSafeModuleForChain(CHAIN_IDS.ETHEREUM_SEPOLIA),
   },
   [CHAIN_IDS.ARBITRUM_SEPOLIA]: {
     id: CHAIN_IDS.ARBITRUM_SEPOLIA,
@@ -41,9 +57,8 @@ const chainDefinitions: Readonly<Record<SupportedChainId, ChainDefinition>> = {
     name: "Arbitrum Sepolia",
     explorerUrl: "https://sepolia.arbiscan.io",
     isTestnet: true,
-    safeWalletFactoryAddress:
-      process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_421614!,
-    safeModuleAddress: process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS_421614!,
+    safeWalletFactoryAddress: getSafeFactoryForChain(CHAIN_IDS.ARBITRUM_SEPOLIA),
+    safeModuleAddress: getSafeModuleForChain(CHAIN_IDS.ARBITRUM_SEPOLIA),
   },
   [CHAIN_IDS.ARBITRUM_MAINNET]: {
     id: CHAIN_IDS.ARBITRUM_MAINNET,
@@ -51,9 +66,8 @@ const chainDefinitions: Readonly<Record<SupportedChainId, ChainDefinition>> = {
     name: "Arbitrum Mainnet",
     explorerUrl: "https://arbiscan.io",
     isTestnet: false,
-    safeWalletFactoryAddress:
-      process.env.NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_42161!,
-    safeModuleAddress: process.env.NEXT_PUBLIC_SAFE_MODULE_ADDRESS_42161!,
+    safeWalletFactoryAddress: getSafeFactoryForChain(CHAIN_IDS.ARBITRUM_MAINNET),
+    safeModuleAddress: getSafeModuleForChain(CHAIN_IDS.ARBITRUM_MAINNET),
   },
 };
 
