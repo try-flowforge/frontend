@@ -3,9 +3,8 @@
 import { useCallback, useState } from "react";
 import { createPublicClient, createWalletClient, custom, http, parseAbi } from "viem";
 import { namehash } from "viem/ens";
-import { mainnet, sepolia } from "viem/chains";
+import { mainnet } from "viem/chains";
 import { api } from "@/lib/api-client";
-import { buildApiUrl } from "@/config/api";
 import { API_CONFIG } from "@/config/api";
 import {
   ENS_PARENT_NAME,
@@ -63,7 +62,6 @@ export function useEnsSubdomain(): UseEnsSubdomainResult {
   const [error, setError] = useState<string | null>(null);
 
   const configuredChains = [
-    getEnsConfig(ENS_CHAIN_IDS.ETHEREUM_SEPOLIA),
     getEnsConfig(ENS_CHAIN_IDS.ETHEREUM_MAINNET),
   ].filter((c): c is EnsChainConfig => c != null);
 
@@ -99,7 +97,7 @@ export function useEnsSubdomain(): UseEnsSubdomainResult {
       if (!cfg) return BigInt(0);
 
       const transport = http();
-      const chain = chainId === ENS_CHAIN_IDS.ETHEREUM_SEPOLIA ? sepolia : chainId === ENS_CHAIN_IDS.ETHEREUM_MAINNET ? mainnet : undefined;
+      const chain = chainId === ENS_CHAIN_IDS.ETHEREUM_MAINNET ? mainnet : undefined;
       if (!chain) return BigInt(0);
       const client = createPublicClient({
         chain,
@@ -142,9 +140,9 @@ export function useEnsSubdomain(): UseEnsSubdomainResult {
         return { success: false, error: "ENS not configured for this chain" };
       }
 
-      const chain = chainId === ENS_CHAIN_IDS.ETHEREUM_SEPOLIA ? sepolia : chainId === ENS_CHAIN_IDS.ETHEREUM_MAINNET ? mainnet : undefined;
+      const chain = chainId === ENS_CHAIN_IDS.ETHEREUM_MAINNET ? mainnet : undefined;
       if (!chain) {
-        return { success: false, error: "Unsupported ENS chain. Use Ethereum Sepolia or Mainnet." };
+        return { success: false, error: "Unsupported ENS chain. Use Ethereum Mainnet." };
       }
 
       const transport = http(chain.rpcUrls?.default?.http?.[0]);

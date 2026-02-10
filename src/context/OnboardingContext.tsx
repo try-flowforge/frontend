@@ -43,7 +43,6 @@ export interface UserData {
     onboarded_at: string;
     safe_wallet_address_testnet?: string;
     safe_wallet_address_mainnet?: string;
-    safe_wallet_address_eth_sepolia?: string;
 }
 
 export interface OnboardingContextType {
@@ -417,9 +416,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     if (chain.id === 42161) {
                         return !user?.safe_wallet_address_mainnet;
                     }
-                    if (chain.id === 11155111) {
-                        return !user?.safe_wallet_address_eth_sepolia;
-                    }
                     return true;
                 });
 
@@ -434,8 +430,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                                 hasWallet = !!user?.safe_wallet_address_testnet;
                             } else if (chain.id === 42161) {
                                 hasWallet = !!user?.safe_wallet_address_mainnet;
-                            } else if (chain.id === 11155111) {
-                                hasWallet = !!user?.safe_wallet_address_eth_sepolia;
                             }
 
                             if (hasWallet) {

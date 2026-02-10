@@ -149,7 +149,7 @@ export const OnboardingSetupModal: React.FC = () => {
         needsOnboarding,
         isOnboarding,
         isCheckingUser,
-        isModeValid,
+        // isModeValid,
         chainsToSetup,
         progress,
         currentSigningChain,

@@ -7,7 +7,6 @@
 export enum SupportedChain {
     ARBITRUM = 'ARBITRUM',
     ARBITRUM_SEPOLIA = 'ARBITRUM_SEPOLIA',
-    ETHEREUM_SEPOLIA = 'ETHEREUM_SEPOLIA',
     BASE = 'BASE',
 }
 
@@ -139,30 +138,7 @@ export const ARBITRUM_MAINNET_TOKENS: TokenInfo[] = [
     },
 ];
 
-/**
- * Ethereum Sepolia Testnet Tokens
- * Standard token addresses on Ethereum Sepolia
- */
-export const ETHEREUM_SEPOLIA_TOKENS: TokenInfo[] = [
-    {
-        address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0x779877A7B0D9E8603169dddb7831e2F6F0dE442f',
-        symbol: 'LINK',
-        decimals: 18,
-        name: 'Chainlink Token',
-    },
-];
+
 
 /**
  * Arbitrum Sepolia Testnet Tokens
@@ -242,8 +218,7 @@ export function getTokensForChain(chain: SupportedChain): TokenInfo[] {
             return ARBITRUM_MAINNET_TOKENS;
         case SupportedChain.ARBITRUM_SEPOLIA:
             return ARBITRUM_SEPOLIA_TOKENS;
-        case SupportedChain.ETHEREUM_SEPOLIA:
-            return ETHEREUM_SEPOLIA_TOKENS;
+
         case SupportedChain.BASE:
             return BASE_MAINNET_TOKENS;
         default:
@@ -264,7 +239,6 @@ export function allowsCustomTokens(_chain: SupportedChain): boolean {
 export const CHAIN_LABELS: Record<SupportedChain, string> = {
     [SupportedChain.ARBITRUM]: 'Arbitrum',
     [SupportedChain.ARBITRUM_SEPOLIA]: 'Arbitrum Sepolia',
-    [SupportedChain.ETHEREUM_SEPOLIA]: 'Ethereum Sepolia',
     [SupportedChain.BASE]: 'Base',
 };
 

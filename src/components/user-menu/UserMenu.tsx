@@ -29,7 +29,7 @@ interface UserProfile {
   email: string;
   safe_wallet_address_testnet: string | null;
   safe_wallet_address_mainnet: string | null;
-  safe_wallet_address_eth_sepolia: string | null;
+
   remaining_sponsored_txs?: number;
 }
 
@@ -274,36 +274,6 @@ export function UserMenu() {
                 )}
               </div>
             </div>
-
-            {/* Ethereum Sepolia */}
-            <div className="w-full px-4 py-2 space-y-1">
-              <div className="flex items-center gap-3 text-sm font-medium text-white/70">
-                <span className="flex-1">Ethereum Sepolia</span>
-                <Switch
-                  checked={currentChainId === CHAIN_IDS.ETHEREUM_SEPOLIA}
-                  onCheckedChange={() => handleNetworkSwitch(CHAIN_IDS.ETHEREUM_SEPOLIA)}
-                  gradient={gradient}
-                />
-              </div>
-              <div className="flex items-center gap-2 pl-1">
-                <div className="text-[10px] font-mono text-white/30 truncate flex-1">
-                  {profile?.safe_wallet_address_eth_sepolia ? (
-                    <span className="flex items-center gap-1">
-                      <HiOutlineShieldCheck className="w-3 h-3 text-white/20" />
-                      {profile.safe_wallet_address_eth_sepolia}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 opacity-50">
-                      <HiOutlineShieldCheck className="w-3 h-3" />
-                      -
-                    </span>
-                  )}
-                </div>
-                {profile?.safe_wallet_address_eth_sepolia && (
-                  <CopyButton text={profile.safe_wallet_address_eth_sepolia} size="sm" />
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Divider */}
@@ -349,8 +319,9 @@ export function UserMenu() {
               <span>Sign Out</span>
             </Button>
           </div>
-        </div>
-      )}
+        </div >
+      )
+      }
 
       <ClaimEnsSubdomainModal
         open={claimEnsOpen}
@@ -362,6 +333,6 @@ export function UserMenu() {
           fetchProfile();
         }}
       />
-    </div>
+    </div >
   );
 }

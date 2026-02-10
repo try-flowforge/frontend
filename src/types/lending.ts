@@ -219,29 +219,7 @@ export const COMPOUND_ARBITRUM_TOKENS: LendingTokenInfo[] = [
     },
 ];
 
-/**
- * Common tokens supported in Aave V3 on Ethereum Sepolia
- */
-export const AAVE_ETHEREUM_SEPOLIA_TOKENS: LendingTokenInfo[] = [
-    {
-        address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0x94a9D9AC8a2410350168e3d824A2207D9d6AB272',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0xFF34B24F1890189744733173766BA299ad5c7730',
-        symbol: 'DAI',
-        decimals: 18,
-        name: 'Dai Stablecoin',
-    },
-];
+
 
 /**
  * Get tokens for a specific lending provider and chain
@@ -250,10 +228,6 @@ export const AAVE_ETHEREUM_SEPOLIA_TOKENS: LendingTokenInfo[] = [
  * @returns Array of LendingTokenInfo
  */
 export function getLendingTokensForChain(provider: LendingProvider, chain: SupportedChain): LendingTokenInfo[] {
-    if (chain === SupportedChain.ETHEREUM_SEPOLIA) {
-        return provider === LendingProvider.AAVE ? AAVE_ETHEREUM_SEPOLIA_TOKENS : [];
-    }
-
     // Default to Arbitrum
     switch (provider) {
         case LendingProvider.AAVE:

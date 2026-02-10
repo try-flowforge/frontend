@@ -41,7 +41,7 @@ export function ClaimEnsSubdomainModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const configuredChain = configuredChains.find((c) => c.chainId === ensChainId) ?? configuredChains[0];
+  // const configuredChain = configuredChains.find((c) => c.chainId === ensChainId) ?? configuredChains[0];
   const durationSeconds = durationOption.seconds;
 
   useEffect(() => {
@@ -176,11 +176,10 @@ export function ClaimEnsSubdomainModal({
                   key={opt.seconds}
                   type="button"
                   onClick={() => setDurationOption(opt)}
-                  className={`rounded-md border px-3 py-2 text-sm ${
-                    durationOption.seconds === opt.seconds
+                  className={`rounded-md border px-3 py-2 text-sm ${durationOption.seconds === opt.seconds
                       ? "border-primary bg-primary/20 text-white"
                       : "border-white/20 text-white/70 hover:border-white/40"
-                  }`}
+                    }`}
                 >
                   {opt.label}
                 </button>
@@ -194,22 +193,20 @@ export function ClaimEnsSubdomainModal({
               <button
                 type="button"
                 onClick={() => setPaymentToken("eth")}
-                className={`rounded-md border px-3 py-2 text-sm ${
-                  paymentToken === "eth"
+                className={`rounded-md border px-3 py-2 text-sm ${paymentToken === "eth"
                     ? "border-primary bg-primary/20 text-white"
                     : "border-white/20 text-white/70 hover:border-white/40"
-                }`}
+                  }`}
               >
                 ETH
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentToken("usdc")}
-                className={`rounded-md border px-3 py-2 text-sm ${
-                  paymentToken === "usdc"
+                className={`rounded-md border px-3 py-2 text-sm ${paymentToken === "usdc"
                     ? "border-primary bg-primary/20 text-white"
                     : "border-white/20 text-white/70 hover:border-white/40"
-                }`}
+                  }`}
               >
                 USDC
               </button>

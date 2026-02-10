@@ -83,7 +83,7 @@ const COMPOUND_COMET_ADDRESS = '0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA';
  * - Quote preview with APY and health factor
  * - Position display showing current supplied/borrowed amounts
  * 
- * Note: Lending is available on Arbitrum and Ethereum Sepolia
+ * Note: Lending is available on Arbitrum Mainnet
  */
 function LendingNodeConfigurationInner({
     nodeData,
@@ -147,11 +147,9 @@ function LendingNodeConfigurationInner({
 
         // Set chain automatically based on current network if not set
         const targetChain =
-            Number(currentChainId) === CHAIN_IDS.ETHEREUM_SEPOLIA
-                ? SupportedChain.ETHEREUM_SEPOLIA
-                : Number(currentChainId) === CHAIN_IDS.ARBITRUM_SEPOLIA
-                    ? SupportedChain.ARBITRUM_SEPOLIA
-                    : SupportedChain.ARBITRUM;
+            Number(currentChainId) === CHAIN_IDS.ARBITRUM_SEPOLIA
+                ? SupportedChain.ARBITRUM_SEPOLIA
+                : SupportedChain.ARBITRUM;
         if (nodeData.lendingChain !== targetChain) {
             updates.lendingChain = targetChain;
         }

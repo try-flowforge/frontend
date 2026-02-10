@@ -90,7 +90,7 @@ export interface AiTransformNodeData extends BaseNodeData {
 // Swap Node Data (for Uniswap, Relay, 1inch, LIFI blocks)
 export interface SwapNodeData extends BaseNodeData {
     swapProvider?: "UNISWAP" | "UNISWAP_V4" | "RELAY" | "ONEINCH" | "LIFI";
-    swapChain?: "ARBITRUM" | "ARBITRUM_SEPOLIA" | "ETHEREUM_SEPOLIA" | "BASE";
+    swapChain?: "ARBITRUM" | "ARBITRUM_SEPOLIA" | "BASE";
     /** Destination chain for cross-chain swaps (LiFi). When set and different from swapChain, use cross-chain route. */
     swapToChain?: "ARBITRUM" | "BASE";
     swapType?: "EXACT_INPUT" | "EXACT_OUTPUT";
@@ -116,7 +116,7 @@ export interface SwapNodeData extends BaseNodeData {
 // Lending Node Data (for Aave, Compound blocks)
 export interface LendingNodeData extends BaseNodeData {
     lendingProvider?: "AAVE" | "COMPOUND";
-    lendingChain?: "ARBITRUM" | "ETHEREUM_SEPOLIA"; // Sepolia added for consistency
+    lendingChain?: "ARBITRUM";
     lendingOperation?: "SUPPLY" | "WITHDRAW" | "BORROW" | "REPAY" | "ENABLE_COLLATERAL" | "DISABLE_COLLATERAL";
     assetAddress?: string;
     assetSymbol?: string;
@@ -140,7 +140,7 @@ export interface LendingNodeData extends BaseNodeData {
 // Oracle Node Data (for Chainlink, Pyth blocks)
 export interface OracleNodeData extends BaseNodeData {
     oracleProvider?: "CHAINLINK" | "PYTH";
-    oracleChain?: "ARBITRUM" | "ARBITRUM_SEPOLIA" | "ETHEREUM_SEPOLIA";
+    oracleChain?: "ARBITRUM" | "ARBITRUM_SEPOLIA";
 
     // Chainlink specific
     aggregatorAddress?: string;

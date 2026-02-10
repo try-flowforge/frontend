@@ -43,21 +43,8 @@ export async function fetchBackendRuntimeConfig(): Promise<BackendRuntimeConfig>
   return data.data;
 }
 
-/**
- * Chain ID for Ethereum Sepolia. Safe factory getSafeWallets() fails on this chain
- * (contract not deployed or different ABI), so we exclude it from Safe onboarding.
- */
-const ETHEREUM_SEPOLIA_CHAIN_ID = 11155111;
-
-/**
- * Get chains to onboard (testnet only).
- * Excludes Ethereum Sepolia because Safe factory is not working there; only Arbitrum Sepolia is used.
- * Mainnet Safes are created on-demand when the user switches to mainnet.
- */
 export function getOnboardingChains(): ChainDefinition[] {
-  return getSelectableChains().filter(
-    (c) => c.isTestnet && c.id !== ETHEREUM_SEPOLIA_CHAIN_ID,
-  );
+  return getSelectableChains().filter((c) => c.isTestnet);
 }
 
 /**

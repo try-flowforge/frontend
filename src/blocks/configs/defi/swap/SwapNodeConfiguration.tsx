@@ -72,7 +72,6 @@ const LIFI_CHAINS: SupportedChain[] = [SupportedChain.ARBITRUM, SupportedChain.B
 const UNISWAP_ROUTER_ADDRESSES: Record<SupportedChain, string> = {
     [SupportedChain.ARBITRUM]: '0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45',
     [SupportedChain.ARBITRUM_SEPOLIA]: '0x101F443B4d1b059569D643917553c771E1b9663E',
-    [SupportedChain.ETHEREUM_SEPOLIA]: '0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E',
     [SupportedChain.BASE]: '',
 };
 
@@ -83,7 +82,6 @@ const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3';
 const UNIVERSAL_ROUTER_ADDRESSES: Record<SupportedChain, string> = {
     [SupportedChain.ARBITRUM]: '0xa51afafe0263b40edaef0df8781ea9aa03e381a3',
     [SupportedChain.ARBITRUM_SEPOLIA]: '0xefd1d4bd4cf1e86da286bb4cb1b8bced9c10ba47',
-    [SupportedChain.ETHEREUM_SEPOLIA]: '0x3A9D48AB9751398BbFa63ad67599Bb04e4BdF98b',
     [SupportedChain.BASE]: '',
 };
 
@@ -162,7 +160,6 @@ export function SwapNodeConfiguration({
 
     // Convert chainId to SupportedChain enum (Base 8453 used for LiFi block only)
     const getChainFromChainId = useCallback((cid: number | null): SupportedChain => {
-        if (cid === CHAIN_IDS.ETHEREUM_SEPOLIA) return SupportedChain.ETHEREUM_SEPOLIA;
         if (cid === CHAIN_IDS.ARBITRUM_SEPOLIA) return SupportedChain.ARBITRUM_SEPOLIA;
         if (cid === 8453) return SupportedChain.BASE;
         return SupportedChain.ARBITRUM;
