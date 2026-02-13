@@ -27,9 +27,7 @@ interface UserProfile {
   id: string;
   address: string;
   email: string;
-  safe_wallet_address_testnet: string | null;
-  safe_wallet_address_mainnet: string | null;
-
+  safe_wallets?: Record<string, string>;
   remaining_sponsored_txs?: number;
 }
 
@@ -214,10 +212,7 @@ export function UserMenu() {
 
             {/* Dynamic Network Selector */}
             {getAllChains().map((chain: ChainInfo) => {
-              const isChainTestnet = getChain(chain.chainId)?.isTestnet;
-              const safeAddress = isChainTestnet
-                ? profile?.safe_wallet_address_testnet
-                : profile?.safe_wallet_address_mainnet;
+              const safeAddress = profile?.safe_wallets?.[String(chain.chainId)];
 
               return (
                 <div key={chain.id} className="w-full px-4 py-2 space-y-1">

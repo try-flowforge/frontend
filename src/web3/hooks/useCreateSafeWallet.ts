@@ -28,16 +28,6 @@ export const useCreateSafeWallet = () => {
     chainId: number; // Track which chain this tx is for
   } | null>(null);
 
-  // Clear signed tx when chain changes to prevent cross-chain accidents
-  useEffect(() => {
-    if (
-      chainId &&
-      signedTxRef.current &&
-      signedTxRef.current.chainId !== chainId
-    ) {
-      signedTxRef.current = null;
-    }
-  }, [chainId]);
 
   // Create Safe wallet: Backend uses authenticated Privy wallet address from the access token
   const createSafeWallet = async (
@@ -63,7 +53,7 @@ export const useCreateSafeWallet = () => {
         return {
           success: false,
           safeAddress: null,
-          error: `Unsupported chain. Please switch to Arbitrum Sepolia (${getChain("ARBITRUM_SEPOLIA")?.chainId}) or Arbitrum Mainnet (${getChain("ARBITRUM")?.chainId}). Current chain: ${effectiveChainId}`,
+          error: `Unsupported network (ID: ${effectiveChainId}). Please select a supported blockchain.`,
         };
       }
 
@@ -205,23 +195,7 @@ export const useCreateSafeWallet = () => {
       if (!getChain(effectiveChainId)) {
         return {
           success: false,
-          error: `Unsupported chain. Please switch to Arbitrum Sepolia (${getChain("ARBITRUM_SEPOLIA")?.chainId}) or Arbitrum Mainnet (${getChain("ARBITRUM")?.chainId}). Current chain: ${effectiveChainId}`,
-        };
-      }
-
-      // CRITICAL: Verify wallet is on the target chain before signing
-      if (chainId !== effectiveChainId) {
-        return {
-          success: false,
-          error: `Wallet must be on chain ${effectiveChainId} to sign. Current chain: ${chainId}. Please switch networks first.`,
-        };
-      }
-
-      const moduleAddress = getContractAddress(effectiveChainId, "safeModule");
-      if (!moduleAddress) {
-        return {
-          success: false,
-          error: `Safe Module address not configured for ${getChain(effectiveChainId)?.name ?? `Chain ${effectiveChainId}`}. Please check your environment variables.`,
+          error: `Unsupported network (ID: ${effectiveChainId}). Please select a supported blockchain.`,
         };
       }
 
@@ -234,7 +208,38 @@ export const useCreateSafeWallet = () => {
 
       // Get Privy EIP-1193 provider
       const provider = await wallet.getEthereumProvider();
+
+      // Dual validation: check reactive state first, but verify with provider if it fails
+      // This handles cases where state updates lag behind the actual network switch
+      if (chainId !== effectiveChainId) {
+        try {
+          const actualChainIdHex = await provider.request({ method: "eth_chainId" });
+          const actualChainId = parseInt(actualChainIdHex as string, 16);
+
+          if (actualChainId !== effectiveChainId) {
+            return {
+              success: false,
+              error: `Wallet must be on chain ${effectiveChainId} to sign. Current wallet chain: ${actualChainId}. Please switch networks first.`,
+            };
+          }
+        } catch (err) {
+          return {
+            success: false,
+            error: `Failed to verify wallet chain: ${err instanceof Error ? err.message : String(err)}`,
+          };
+        }
+      }
+
       const ethersProvider = new ethers.BrowserProvider(provider);
+
+      const moduleAddress = getContractAddress(effectiveChainId, "safeModule");
+      if (!moduleAddress) {
+        return {
+          success: false,
+          error: `Safe Module address not configured for ${getChain(effectiveChainId)?.name ?? `Chain ${effectiveChainId}`}. Please check your environment variables.`,
+        };
+      }
+
       const signer = await ethersProvider.getSigner();
       const signerAddress = await signer.getAddress();
 
@@ -353,35 +358,43 @@ export const useCreateSafeWallet = () => {
     } = signedTxRef.current;
 
     try {
-      // Check if chainId is available
-      if (!chainId) {
-        return {
-          success: false,
-          error: "Wallet not ready. Please wait for wallet to initialize.",
-        };
-      }
+      // Verify current chain directly from provider to handle state lag
+      if (wallet) {
+        try {
+          const p = await wallet.getEthereumProvider();
+          const actualHex = await p.request({ method: "eth_chainId" });
+          const actualNum = parseInt(actualHex as string, 16);
 
-      // CRITICAL: Verify we're still on the same chain as when we signed
-      if (chainId !== txChainId) {
-        return {
-          success: false,
-          error: `Chain mismatch: Transaction was signed on chain ${txChainId} but wallet is now on chain ${chainId}. Please switch back to chain ${txChainId}.`,
-        };
+          if (actualNum !== txChainId) {
+            return {
+              success: false,
+              error: `Chain mismatch: Wallet is on chain ${actualNum} but transaction was signed for chain ${txChainId}. Please switch back.`,
+            };
+          }
+        } catch (err) {
+          // If we can't verify but have a reactive mismatch, still fail
+          if (chainId && chainId !== txChainId) {
+            return {
+              success: false,
+              error: `Could not verify chain and state mismatch: Expected ${txChainId}, found ${chainId}.`,
+            };
+          }
+        }
       }
 
       // Validate chain ID
-      if (!getChain(chainId)) {
+      if (!getChain(txChainId)) {
         return {
           success: false,
-          error: `Unsupported chain. Please switch to Arbitrum Sepolia (${getChain("ARBITRUM_SEPOLIA")?.chainId}) or Arbitrum Mainnet (${getChain("ARBITRUM")?.chainId}). Current chain: ${chainId}`,
+          error: `Unsupported network (ID: ${txChainId}). Please select a supported blockchain.`,
         };
       }
 
-      const moduleAddress = getContractAddress(chainId, "safeModule");
+      const moduleAddress = getContractAddress(txChainId, "safeModule");
       if (!moduleAddress) {
         return {
           success: false,
-          error: `Safe Module address not configured for ${getChain(chainId)?.name ?? `Chain ${chainId}`}. Please check your environment variables.`,
+          error: `Safe Module address not configured for ${getChain(txChainId)?.name ?? `Chain ${txChainId}`}. Please check your environment variables.`,
         };
       }
 
@@ -423,7 +436,7 @@ export const useCreateSafeWallet = () => {
             Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
-            chainId,
+            chainId: txChainId,
             safeAddress,
             safeTxData,
             signatures,

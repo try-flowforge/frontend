@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
 import { SafeWalletProvider } from "@/context/SafeWalletContext";
-import { OnboardingProvider } from "@/context/OnboardingContext";
+import { OnboardingProvider } from "@/onboarding/context/OnboardingContext";
 import { ToastProvider } from "@/context/ToastContext";
-import { OnboardingSetupModal } from "@/components/onboard/OnboardingSetupModal";
-import { WalletChoiceModal } from "@/components/onboard/WalletChoiceModal";
+import { OnboardingWizard } from "@/onboarding/components/OnboardingWizard";
 import { LenisProvider } from "./LenisProvider";
 import PrivyAuthProvider from "./PrivyProvider";
 
@@ -17,28 +16,28 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             new QueryClient({
                 defaultOptions: {
                     queries: {
+                        staleTime: 60 * 1000,
                         refetchOnWindowFocus: false,
-                        retry: false,
+                        retry: 1,
                     },
                 },
             })
     );
 
     return (
-        <ToastProvider>
-            <LenisProvider>
-                <PrivyAuthProvider>
-                    <QueryClientProvider client={queryClient}>
-                        <OnboardingProvider>
-                            <SafeWalletProvider>
+        <PrivyAuthProvider>
+            <QueryClientProvider client={queryClient}>
+                <OnboardingProvider>
+                    <SafeWalletProvider>
+                        <ToastProvider>
+                            <LenisProvider>
                                 {children}
-                                <WalletChoiceModal />
-                                <OnboardingSetupModal />
-                            </SafeWalletProvider>
-                        </OnboardingProvider>
-                    </QueryClientProvider>
-                </PrivyAuthProvider>
-            </LenisProvider>
-        </ToastProvider>
+                                <OnboardingWizard />
+                            </LenisProvider>
+                        </ToastProvider>
+                    </SafeWalletProvider>
+                </OnboardingProvider>
+            </QueryClientProvider>
+        </PrivyAuthProvider>
     );
 }

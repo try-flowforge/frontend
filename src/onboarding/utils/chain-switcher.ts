@@ -25,14 +25,14 @@ export async function ensureChainSelected(
 
 // Wait for chain to be active
 export async function waitForChain(
-  getCurrentChainId: () => number | null,
+  getCurrentChainId: () => (number | null) | Promise<number | null>,
   targetChainId: number,
   timeoutMs: number = 3000,
 ): Promise<void> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeoutMs) {
-    const currentChainId = getCurrentChainId();
+    const currentChainId = await getCurrentChainId();
 
     if (currentChainId === targetChainId) {
       return;

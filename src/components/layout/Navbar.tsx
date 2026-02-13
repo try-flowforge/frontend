@@ -6,6 +6,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { BiLogInCircle, BiRocket } from "react-icons/bi";
 import { UserMenu } from "../user-menu/UserMenu";
 import { Button } from "../ui/Button";
+import { OnboardingProgressIndicator } from "@/onboarding/components/OnboardingProgressIndicator";
 import Image from "next/image";
 import logo from "@/assets/logo.svg";
 
@@ -59,14 +60,14 @@ export default function NavBar() {
         {ready && (
           <>
             {authenticated ? (
-              <div>
+              <div className="flex items-center gap-3">
+                <OnboardingProgressIndicator />
                 <UserMenu />
               </div>
             ) : (
               <Button onClick={() => login({ loginMethods: ['email'] })}>
                 <BiLogInCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">Sign In</span>
-                <span className="sm:hidden">Sign In</span>
+                <span>Sign In</span>
               </Button>
             )}
           </>

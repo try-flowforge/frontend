@@ -7,7 +7,7 @@ import React, {
     useMemo,
     useRef,
 } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 import { useCreateSafeWallet } from "@/web3/hooks/useCreateSafeWallet";
 import { API_CONFIG, buildApiUrl } from "@/config/api";
@@ -106,8 +106,14 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
     children,
 }) => {
     const { authenticated, ready } = usePrivy();
-    const { walletAddress, ethereumProvider, wallet } = usePrivyWallet();
-    const { getPrivyAccessToken } = usePrivyWallet();
+    const { wallets } = useWallets();
+    const {
+        walletAddress,
+        ethereumProvider,
+        wallet,
+        chainId,
+        getPrivyAccessToken
+    } = usePrivyWallet();
     const { signEnableModule, submitEnableModule, createSafeWallet } = useCreateSafeWallet();
 
     // Mode validation state
@@ -331,6 +337,32 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             const chainKey = chain.id;
             const numericChainId = chain.chainId;
 
+            // Utility to get the latest wallet from the wallets array
+            // This avoids stale closure issues if the wallet object updates during async steps
+            const getLatestWallet = () => {
+                const linked = wallets.filter((w) => w.linked || w.walletClientType === "privy");
+                return linked.find((w) => w.walletClientType !== "privy") || linked.find((w) => w.walletClientType === "privy") || null;
+            };
+
+            // Phase 0: Ensure we have a wallet before starting
+            let currentWallet = getLatestWallet();
+            if (!currentWallet) {
+                // Wait up to 5 seconds for a wallet to appear
+                const startTime = Date.now();
+                while (!currentWallet && Date.now() - startTime < 5000) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    currentWallet = getLatestWallet();
+                }
+
+                if (!currentWallet) {
+                    setProgress((prev) => ({
+                        ...prev,
+                        [chainKey]: { ...prev[chainKey], error: "Wallet not connected. Please ensure your wallet is ready." },
+                    }));
+                    return false;
+                }
+            }
+
             try {
                 // Step 1: Create wallet
                 setProgress((prev) => ({
@@ -363,9 +395,20 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 setCurrentSigningChain(String(chainKey));
 
                 try {
-                    await ensureChainSelected(wallet || null, numericChainId);
-                    // Wait for chain to be active
-                    await waitForChain(() => numericChainId, numericChainId, 10000);
+                    // Refresh wallet before switching
+                    const walletToUse = getLatestWallet();
+                    await ensureChainSelected(walletToUse, numericChainId);
+                    // Wait for chain to be active by checking the provider directly
+                    await waitForChain(async () => {
+                        try {
+                            const p = await walletToUse?.getEthereumProvider();
+                            if (!p) return null;
+                            const hex = await p.request({ method: "eth_chainId" });
+                            return parseInt(hex as string, 16);
+                        } catch {
+                            return null;
+                        }
+                    }, numericChainId, 15000);
                 } catch (switchError) {
                     setProgress((prev) => ({
                         ...prev,
@@ -494,6 +537,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             wallet,
             ethereumProvider,
             walletAddress,
+            chainId,
+            wallets,
         ]
     );
 

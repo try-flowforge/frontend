@@ -9,7 +9,7 @@ export default function PrivyAuthProvider({ children }: { children: React.ReactN
 
     // Get chain configuration from centralized module
     const supportedChains = SUPPORTED_VIEM_CHAINS;
-    const defaultChain = getChain(Chains.ARBITRUM_SEPOLIA)?.viemChain;
+    const defaultChain = supportedChains[0];
 
     return (
         <PrivyProvider
