@@ -83,6 +83,7 @@ export const OnboardingWizard: React.FC = () => {
     }
 
     const direction = stepIndex >= stepHistory.prev ? 1 : -1;
+    const shouldShowSkipButton = currentStep === "chain";
 
     // Show immediately if authenticated and either needs onboarding or is still checking
     const shouldShow =
@@ -260,13 +261,13 @@ export const OnboardingWizard: React.FC = () => {
                                     </motion.div>
                                 </AnimatePresence>
 
-                                {/* Skip button — only on wallet step */}
-                                {currentStep === "wallet" && (
+                                {/* Skip button - visible through wallet + chain steps */}
+                                {shouldShowSkipButton && (
                                     <motion.div
                                         className="mt-6 flex flex-col items-center gap-2 mx-auto"
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
-                                        transition={{ delay: 0.6 }}
+                                        transition={{ delay: 0.4 }}
                                     >
                                         <button
                                             className="text-xs text-white/40 hover:text-white/70 transition-colors underline underline-offset-4 cursor-pointer font-medium"
@@ -275,7 +276,7 @@ export const OnboardingWizard: React.FC = () => {
                                             Skip for now
                                         </button>
                                         <p className="text-[10px] text-white/30 text-center max-w-lg">
-                                            You will be able to setup everything from your wallet block later.
+                                            You can complete the full setup later from the wallet block.
                                         </p>
                                     </motion.div>
                                 )}

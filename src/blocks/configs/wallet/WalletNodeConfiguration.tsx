@@ -1,26 +1,179 @@
 "use client";
 
-import { Typography } from "@/components/ui/Typography";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { useSafeWalletContext } from "@/context/SafeWalletContext";
-import {
-  LuCircleCheck,
-  LuCircleX,
-  LuLoader,
-} from "react-icons/lu";
-import { HiCog } from "react-icons/hi2";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { SimpleCard } from "@/components/ui/SimpleCard";
-import { Dropdown } from "@/components/ui/Dropdown";
 import { AuthenticationStatus } from "@/components/workspace/AuthenticationStatus";
+import { useSafeWalletContext } from "@/context/SafeWalletContext";
+import { useOnboarding } from "@/onboarding/context/OnboardingContext";
+import { ChainInfo, getAllChains } from "@/web3/config/chain-registry";
+import { WalletCreationFlowCard } from "./components/WalletCreationFlowCard";
+import { WalletModuleStatusCard } from "./components/WalletModuleStatusCard";
+import { WalletNetworkSelectionCard } from "./components/WalletNetworkSelectionCard";
+import { WalletSafeInfoCard } from "./components/WalletSafeInfoCard";
+import { WalletSetupProgressCard } from "./components/WalletSetupProgressCard";
+import {
+  getChainProgress,
+  isChainSetupComplete,
+} from "./components/walletSetupUtils";
 
 function WalletNodeConfigurationInner() {
   const { wallets } = useWallets();
   const { authenticated } = usePrivy();
-  const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
-  const isConnected = authenticated && embeddedWallet !== undefined;
-  const address = embeddedWallet?.address;
+  const linkedWallets = wallets.filter(
+    (wallet) => wallet.linked || wallet.walletClientType === "privy",
+  );
+  const primaryWallet =
+    linkedWallets.find((wallet) => wallet.walletClientType !== "privy") ||
+    linkedWallets.find((wallet) => wallet.walletClientType === "privy");
+  const isConnected = authenticated && primaryWallet !== undefined;
+  const address = primaryWallet?.address;
+
   const { selection, creation } = useSafeWalletContext();
+  const {
+    chainsToSetup,
+    progress,
+    isOnboarding,
+    isCheckingUser,
+    currentSigningChain,
+    setSelectedChains,
+    saveUserChains,
+    startOnboarding,
+    retryChain,
+  } = useOnboarding();
+
+  const availableChains = useMemo<ChainInfo[]>(() => getAllChains(), []);
+  const [selectedChainIds, setSelectedChainIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isSavingChains, setIsSavingChains] = useState(false);
+  const hasRefreshedAfterSetupRef = useRef(false);
+  const hasAutoCollapsedSetupRef = useRef(false);
+  const [isSetupExpanded, setIsSetupExpanded] = useState(true);
+
+  useEffect(() => {
+    setSelectedChainIds(new Set(chainsToSetup.map((chain) => chain.id)));
+  }, [chainsToSetup]);
+
+  const savedChainIds = useMemo(
+    () => new Set(chainsToSetup.map((chain) => chain.id)),
+    [chainsToSetup],
+  );
+
+  const hasUnsavedChainSelection = useMemo(() => {
+    if (savedChainIds.size !== selectedChainIds.size) {
+      return true;
+    }
+
+    for (const chainId of selectedChainIds) {
+      if (!savedChainIds.has(chainId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }, [savedChainIds, selectedChainIds]);
+
+  const allChainsReady = useMemo(() => {
+    if (chainsToSetup.length === 0) {
+      return false;
+    }
+
+    return chainsToSetup.every((chain) =>
+      isChainSetupComplete(getChainProgress(progress, chain.id)),
+    );
+  }, [chainsToSetup, progress]);
+
+  const readyChainCount = useMemo(
+    () =>
+      chainsToSetup.filter((chain) =>
+        isChainSetupComplete(getChainProgress(progress, chain.id)),
+      ).length,
+    [chainsToSetup, progress],
+  );
+
+  const currentSigningChainName = useMemo(() => {
+    if (!currentSigningChain) {
+      return null;
+    }
+
+    const chain = chainsToSetup.find(
+      (item) =>
+        item.id === currentSigningChain ||
+        String(item.chainId) === currentSigningChain,
+    );
+
+    return chain?.name || null;
+  }, [chainsToSetup, currentSigningChain]);
+
+  useEffect(() => {
+    if (isOnboarding) {
+      hasRefreshedAfterSetupRef.current = false;
+      return;
+    }
+
+    if (!allChainsReady || hasRefreshedAfterSetupRef.current) {
+      return;
+    }
+
+    hasRefreshedAfterSetupRef.current = true;
+    void selection.refreshSafeList();
+    void selection.refreshModuleStatus();
+  }, [allChainsReady, isOnboarding, selection]);
+
+  useEffect(() => {
+    if (isOnboarding) {
+      setIsSetupExpanded(true);
+      hasAutoCollapsedSetupRef.current = false;
+      return;
+    }
+
+    if (allChainsReady && !hasAutoCollapsedSetupRef.current) {
+      setIsSetupExpanded(false);
+      hasAutoCollapsedSetupRef.current = true;
+      return;
+    }
+
+    if (!allChainsReady) {
+      hasAutoCollapsedSetupRef.current = false;
+    }
+  }, [allChainsReady, isOnboarding]);
+
+  const toggleChain = useCallback((chainId: string) => {
+    setSelectedChainIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(chainId)) {
+        next.delete(chainId);
+      } else {
+        next.add(chainId);
+      }
+      return next;
+    });
+  }, []);
+
+  const saveChainSelection = useCallback(async () => {
+    if (selectedChainIds.size === 0) {
+      return;
+    }
+
+    setIsSavingChains(true);
+    try {
+      const selectedChains = availableChains.filter((chain) =>
+        selectedChainIds.has(chain.id),
+      );
+      setSelectedChains(selectedChains);
+      await saveUserChains(selectedChains.map((chain) => chain.id));
+    } finally {
+      setIsSavingChains(false);
+    }
+  }, [availableChains, saveUserChains, selectedChainIds, setSelectedChains]);
+
+  const runChainSetup = useCallback(async () => {
+    if (hasUnsavedChainSelection || chainsToSetup.length === 0) {
+      return;
+    }
+    await startOnboarding();
+  }, [chainsToSetup.length, hasUnsavedChainSelection, startOnboarding]);
 
   if (!isConnected) {
     return <AuthenticationStatus />;
@@ -28,239 +181,39 @@ function WalletNodeConfigurationInner() {
 
   return (
     <div className="space-y-4">
-      {/* Section A: Safe Wallet Info (shown after connect) */}
-      {isConnected && address && (
-        <SimpleCard className="p-5">
-          <div className="space-y-1 mb-4">
-            <Typography
-              variant="h5"
-              className="font-semibold text-foreground"
-            >
-              Safe Wallet
-            </Typography>
-            <Typography
-              variant="bodySmall"
-              className="text-muted-foreground"
-            >
-              Multi-signature wallet for secure transaction execution
-            </Typography>
-          </div>
+      <WalletNetworkSelectionCard
+        availableChains={availableChains}
+        selectedChainIds={selectedChainIds}
+        isCheckingUser={isCheckingUser}
+        isSavingChains={isSavingChains}
+        hasUnsavedChainSelection={hasUnsavedChainSelection}
+        onToggleChain={toggleChain}
+        onSaveSelection={() => void saveChainSelection()}
+      />
 
-          {/* Loading state */}
-          {selection.isLoading && (
-            <div className="flex items-center justify-center py-6">
-              <LuLoader className="w-5 h-5 animate-spin text-primary" />
-              <span className="ml-2 text-sm text-muted-foreground">
-                Loading safes...
-              </span>
-            </div>
-          )}
+      <WalletSetupProgressCard
+        chainsToSetup={chainsToSetup}
+        progress={progress}
+        isOnboarding={isOnboarding}
+        currentSigningChainName={currentSigningChainName}
+        isSetupExpanded={isSetupExpanded}
+        readyChainCount={readyChainCount}
+        allChainsReady={allChainsReady}
+        hasUnsavedChainSelection={hasUnsavedChainSelection}
+        isSavingChains={isSavingChains}
+        onToggleExpanded={() => setIsSetupExpanded((previous) => !previous)}
+        onRetryChain={(chainId) => void retryChain(chainId)}
+        onRunSetup={() => void runChainSetup()}
+      />
 
-          {/* Error state */}
-          {selection.error && (
-            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-              <Typography variant="caption" className="text-destructive">
-                {selection.error}
-              </Typography>
-            </div>
-          )}
+      <WalletSafeInfoCard address={address} selection={selection} />
 
-          {/* Safe wallet info */}
-          {!selection.isLoading && !selection.error && (
-            <div className="space-y-3">
-              {selection.safeWallets.length > 0 ? (
-                <>
-                  <Dropdown
-                    value={selection.selectedSafe || ""}
-                    onChange={(e) =>
-                      selection.selectSafe(e.target.value || null)
-                    }
-                    placeholder="Select a Safe wallet..."
-                    aria-label="Select Safe wallet"
-                    options={selection.safeWallets.map((safe) => ({
-                      value: safe,
-                      label: `${safe.slice(0, 10)}...${safe.slice(-4)}`,
-                    }))}
-                  />
-                  {selection.selectedSafe && (
-                    <div className="p-3 rounded-lg bg-secondary/30 border border-border">
-                      <Typography variant="caption" className="text-muted-foreground text-xs mb-1">
-                        Selected Safe
-                      </Typography>
-                      <Typography variant="caption" className="text-foreground font-mono text-xs break-all">
-                        {selection.selectedSafe}
-                      </Typography>
-                    </div>
-                  )}
-                  <div className="pt-2 border-t border-border">
-                    <Typography variant="caption" className="text-muted-foreground text-xs">
-                      {selection.safeWallets.length} Safe wallet{selection.safeWallets.length !== 1 ? "s" : ""} available
-                    </Typography>
-                  </div>
-                </>
-              ) : (
-                <div className="p-4 rounded-lg bg-secondary/20 border border-border text-center">
-                  <Typography variant="caption" className="text-muted-foreground">
-                    No Safe wallets found. Use the toolbar to create a new Safe wallet.
-                  </Typography>
-                </div>
-              )}
-            </div>
-          )}
-        </SimpleCard>
+      {selection.selectedSafe && (
+        <WalletModuleStatusCard selection={selection} />
       )}
 
-      {/* Section B: Module Status (when a Safe selected) */}
-      {isConnected && selection.selectedSafe && (
-        <SimpleCard className="p-5">
-          <div className="flex items-start gap-4 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-amber-500 to-orange-500 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
-              <HiCog className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <Typography
-                variant="bodySmall"
-                className="font-semibold text-foreground mb-1"
-              >
-                TriggerX Module
-              </Typography>
-              <Typography
-                variant="caption"
-                className="text-muted-foreground"
-              >
-                Module status for automated transaction execution
-              </Typography>
-            </div>
-          </div>
-
-          {selection.checkingModule ? (
-            <div className="flex items-center justify-center py-6">
-              <LuLoader className="w-5 h-5 animate-spin text-primary mr-2" />
-              <span className="text-sm text-muted-foreground">
-                Checking module status...
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Status display */}
-              <div className="flex items-center justify-between py-3 px-4 rounded-lg bg-secondary/30 border border-border">
-                <span className="text-sm font-medium text-foreground">
-                  Status
-                </span>
-                <div className="flex items-center gap-2">
-                  {selection.moduleEnabled === true && (
-                    <>
-                      <LuCircleCheck className="w-5 h-5 text-success" />
-                      <span className="text-sm text-success font-semibold">
-                        Enabled
-                      </span>
-                    </>
-                  )}
-                  {selection.moduleEnabled === false && (
-                    <>
-                      <LuCircleX className="w-5 h-5 text-destructive" />
-                      <span className="text-sm text-destructive font-semibold">
-                        Disabled
-                      </span>
-                    </>
-                  )}
-                  {selection.moduleEnabled === null && (
-                    <span className="text-sm text-muted-foreground">
-                      Unknown
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {selection.moduleEnabled === false && (
-                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <Typography variant="caption" className="text-amber-500 text-xs">
-                    Module is disabled. Use the toolbar to enable it.
-                  </Typography>
-                </div>
-              )}
-
-              {selection.moduleEnabled === true && (
-                <div className="p-3 rounded-lg bg-success/10 border border-success/20">
-                  <Typography variant="caption" className="text-success text-xs">
-                    Module is enabled and ready for automated transactions.
-                  </Typography>
-                </div>
-              )}
-            </div>
-          )}
-        </SimpleCard>
-      )}
-
-      {/* Creation flow status */}
       {creation.showCreateFlow && (
-        <SimpleCard className="p-5 bg-white/5 border border-white/20">
-          <Typography
-            variant="bodySmall"
-            className="font-semibold text-foreground mb-4"
-          >
-            Creating Safe Wallet...
-          </Typography>
-
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              {creation.createStep === "pending" && (
-                <LuLoader className="w-4 h-4 animate-spin text-primary" />
-              )}
-              {creation.createStep === "success" && (
-                <LuCircleCheck className="w-4 h-4 text-success" />
-              )}
-              {creation.createStep === "error" && (
-                <LuCircleX className="w-4 h-4 text-destructive" />
-              )}
-              <Typography variant="caption" className="text-foreground">
-                Creating Safe contract
-              </Typography>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {creation.signStep === "pending" && (
-                <LuLoader className="w-4 h-4 animate-spin text-primary" />
-              )}
-              {creation.signStep === "success" && (
-                <LuCircleCheck className="w-4 h-4 text-success" />
-              )}
-              {creation.signStep === "error" && (
-                <LuCircleX className="w-4 h-4 text-destructive" />
-              )}
-              <Typography variant="caption" className="text-foreground">
-                Signing module enable
-              </Typography>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {creation.enableStep === "pending" && (
-                <LuLoader className="w-4 h-4 animate-spin text-primary" />
-              )}
-              {creation.enableStep === "success" && (
-                <LuCircleCheck className="w-4 h-4 text-success" />
-              )}
-              {creation.enableStep === "error" && (
-                <LuCircleX className="w-4 h-4 text-destructive" />
-              )}
-              <Typography variant="caption" className="text-foreground">
-                Enabling module
-              </Typography>
-            </div>
-          </div>
-
-          {(creation.createError ||
-            creation.signError ||
-            creation.enableError) && (
-              <div className="mt-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                <Typography variant="caption" className="text-destructive text-xs">
-                  {creation.createError ||
-                    creation.signError ||
-                    creation.enableError}
-                </Typography>
-              </div>
-            )}
-        </SimpleCard>
+        <WalletCreationFlowCard creation={creation} />
       )}
     </div>
   );
