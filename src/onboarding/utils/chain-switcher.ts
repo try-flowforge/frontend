@@ -1,37 +1,33 @@
-/**
- * Chain Switcher Module
- * Handles automatic chain switching
- */
-
+// Chain Switcher Module to switch chain
 import type { ConnectedWallet } from "@privy-io/react-auth";
 
-/**
- * Ensure wallet is on the target chain, switch if needed
- */
+// Ensure wallet is on the target chain, switch if needed
 export async function ensureChainSelected(
-  embeddedWallet: ConnectedWallet | null,
+  wallet: ConnectedWallet | null,
   targetChainId: number,
 ): Promise<void> {
-  if (!embeddedWallet) {
-    throw new Error("Embedded wallet not available");
+  if (!wallet) {
+    throw new Error("Wallet not connected");
+  }
+
+  const currentChainId = parseInt(wallet.chainId.split(":")[1] || "0");
+  if (currentChainId === targetChainId) {
+    return;
   }
 
   try {
-    await embeddedWallet.switchChain(targetChainId);
+    await wallet.switchChain(targetChainId);
   } catch (error) {
-    // Enhance error message
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to switch to chain ${targetChainId}: ${message}`);
   }
 }
 
-/**
- * Wait for chain to be active (with timeout)
- */
+// Wait for chain to be active
 export async function waitForChain(
   getCurrentChainId: () => number | null,
   targetChainId: number,
-  timeoutMs: number = 5000,
+  timeoutMs: number = 3000,
 ): Promise<void> {
   const startTime = Date.now();
 
@@ -42,7 +38,6 @@ export async function waitForChain(
       return;
     }
 
-    // Wait 100ms before checking again
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 

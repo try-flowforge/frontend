@@ -1,15 +1,9 @@
-/**
- * Onboarding Configuration Module
- * Fetches backend runtime config and provides chains for Safe onboarding
- */
-
+// Onboarding Configuration for Sync backend runtime config
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 import { getAllChains, ChainInfo } from "@/web3/config/chain-registry";
 
-/**
- * Runtime configuration from backend
- */
-export interface BackendRuntimeConfig {
+// Runtime configuration from backend
+interface BackendRuntimeConfig {
   activeChains: number[];
   chainDetails: Array<{
     chainId: number;
@@ -21,9 +15,7 @@ export interface BackendRuntimeConfig {
   timestamp: string;
 }
 
-/**
- * Fetch backend runtime configuration
- */
+// Fetch backend runtime configuration
 export async function fetchBackendRuntimeConfig(): Promise<BackendRuntimeConfig> {
   const response = await fetch(
     buildApiUrl(API_CONFIG.ENDPOINTS.META.RUNTIME_CONFIG),
@@ -46,9 +38,7 @@ export function getOnboardingChains(): ChainInfo[] {
   return getAllChains().filter((c) => c.isTestnet);
 }
 
-/**
- * Fetch backend config and return onboarding chains
- */
+// Fetch backend config and return onboarding chains
 export async function validateAndGetOnboardingChains(): Promise<{
   chains: ChainInfo[];
   backendConfig: BackendRuntimeConfig;
