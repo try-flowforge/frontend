@@ -21,7 +21,6 @@ import {
     getProviderLabel,
     getCategoryLabel,
     type OracleProvider,
-    type OracleChain,
     type PriceFeed,
     type FeedCategory,
 } from "@/lib/oracle-api";
@@ -41,7 +40,7 @@ function OracleNodeConfigurationV2Inner({
 }: OracleNodeConfigurationV2Props) {
     // Extract oracle data
     const oracleProvider = (nodeData.oracleProvider as OracleProvider) || "CHAINLINK";
-    const oracleChain = (nodeData.oracleChain as OracleChain) || "ARBITRUM_SEPOLIA";
+    const oracleChain = (nodeData.oracleChain as string) || "ARBITRUM_SEPOLIA";
     const selectedSymbol = (nodeData.symbol as string) || "";
     const feedName = (nodeData.feedName as string) || "";
     const aggregatorAddress = (nodeData.aggregatorAddress as string) || "";
@@ -79,7 +78,7 @@ function OracleNodeConfigurationV2Inner({
     }, [loadAvailableFeeds]);
 
     // Handle chain change
-    const handleChainChange = useCallback((chain: OracleChain) => {
+    const handleChainChange = useCallback((chain: string) => {
         handleDataChange({
             oracleChain: chain,
             // Reset feed selection when chain changes
@@ -147,10 +146,10 @@ function OracleNodeConfigurationV2Inner({
     }, [selectedSymbol, isChainlink, aggregatorAddress, priceFeedId]);
 
     // Get chain badge color
-    const getChainBadgeColor = (chain: OracleChain) => {
+    const getChainBadgeColor = (chain: string) => {
         if (chain === "ARBITRUM") return "bg-green-500/20 text-green-400 border-green-500/30";
         if (chain === "ARBITRUM_SEPOLIA") return "bg-orange-500/20 text-orange-400 border-orange-500/30";
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30"; // Ethereum Sepolia
+
     };
 
     // Prepare dropdown options
@@ -235,7 +234,7 @@ function OracleNodeConfigurationV2Inner({
                 </Typography>
 
                 <div className="grid grid-cols-1 gap-2">
-                    {(["ARBITRUM_SEPOLIA", "ETHEREUM_SEPOLIA", "ARBITRUM"] as OracleChain[]).map((chain) => (
+                    {(["ARBITRUM_SEPOLIA", "ARBITRUM"] as string[]).map((chain) => (
                         <button
                             key={chain}
                             onClick={() => handleChainChange(chain)}

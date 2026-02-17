@@ -30,10 +30,9 @@ import {
     LendingInputConfig,
     LENDING_OPERATION_LABELS,
     INTEREST_RATE_MODE_LABELS,
-    SupportedChain,
     getLendingTokensForChain,
 } from "@/types/lending";
-import { CHAIN_IDS } from "@/web3/chains";
+import { getChain } from '@/web3/config/chain-registry';
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 
 interface LendingNodeConfigurationProps {
@@ -83,7 +82,7 @@ const COMPOUND_COMET_ADDRESS = '0xA5EDBDD9646f8dFF606d7448e414884C7d905dCA';
  * - Quote preview with APY and health factor
  * - Position display showing current supplied/borrowed amounts
  * 
- * Note: Lending is available on Arbitrum and Ethereum Sepolia
+ * Note: Lending is available on Arbitrum Mainnet
  */
 function LendingNodeConfigurationInner({
     nodeData,
@@ -97,7 +96,8 @@ function LendingNodeConfigurationInner({
 
     const { selection } = useSafeWalletContext();
     const selectedSafe = selection.selectedSafe;
-    const { chainId: currentChainId } = useWallets().wallets.find(w => w.walletClientType === "privy") || { chainId: null };
+    const walletChainId = embeddedWallet?.chainId || null;
+    const currentInternalId = getChain(walletChainId)?.id;
 
     // Local state
     const [quoteState, setQuoteState] = useState<QuoteState>({
@@ -125,7 +125,7 @@ function LendingNodeConfigurationInner({
 
     // Get available tokens for the provider and chain
     const availableTokens = useMemo(() => {
-        const chain = (nodeData.lendingChain as SupportedChain) || SupportedChain.ARBITRUM;
+        const chain = (nodeData.lendingChain as string) || "ARBITRUM";
         return getLendingTokensForChain(lendingProvider, chain);
     }, [lendingProvider, nodeData.lendingChain]);
 
@@ -147,11 +147,9 @@ function LendingNodeConfigurationInner({
 
         // Set chain automatically based on current network if not set
         const targetChain =
-            Number(currentChainId) === CHAIN_IDS.ETHEREUM_SEPOLIA
-                ? SupportedChain.ETHEREUM_SEPOLIA
-                : Number(currentChainId) === CHAIN_IDS.ARBITRUM_SEPOLIA
-                    ? SupportedChain.ARBITRUM_SEPOLIA
-                    : SupportedChain.ARBITRUM;
+            currentInternalId === "ARBITRUM_SEPOLIA"
+                ? "ARBITRUM_SEPOLIA"
+                : "ARBITRUM";
         if (nodeData.lendingChain !== targetChain) {
             updates.lendingChain = targetChain;
         }
@@ -225,7 +223,7 @@ function LendingNodeConfigurationInner({
                     : undefined,
             };
 
-            const chain = (nodeData.lendingChain as SupportedChain) || SupportedChain.ARBITRUM;
+            const chain = (nodeData.lendingChain as string) || "ARBITRUM";
             const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.LENDING.QUOTE)}/${lendingProvider}/${chain}`;
 
             const response = await fetch(url, {
@@ -296,7 +294,7 @@ function LendingNodeConfigurationInner({
         setPositionState({ loading: true, error: null, data: null });
 
         try {
-            const chain = (nodeData.lendingChain as SupportedChain) || SupportedChain.ARBITRUM;
+            const chain = (nodeData.lendingChain as string) || "ARBITRUM";
             const url = `${buildApiUrl(API_CONFIG.ENDPOINTS.LENDING.POSITION)}/${lendingProvider}/${chain}/${effectiveWalletAddress}?asset=${assetAddress}`;
 
             const response = await fetch(url);

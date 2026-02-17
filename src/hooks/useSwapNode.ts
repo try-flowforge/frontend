@@ -7,7 +7,6 @@ import { useState, useCallback, useMemo } from "react";
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 import {
     SwapProvider,
-    SupportedChain,
     SwapType,
     SwapQuote,
     SwapInputConfig,
@@ -22,7 +21,7 @@ interface SwapQuoteState {
 
 interface UseSwapNodeOptions {
     provider: SwapProvider;
-    chain: SupportedChain;
+    chain: string;
     sourceToken: TokenInfo | null;
     destinationToken: TokenInfo | null;
     amount: string;

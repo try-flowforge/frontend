@@ -3,13 +3,12 @@ import {
     LendingProvider,
     LendingOperation,
     InterestRateMode,
-    SupportedChain,
 } from "@/types/lending";
 
 /**
  * Compound Lending Block Definition
  * Allows users to supply, withdraw, borrow, and repay via Compound V3
- * Only available on Arbitrum mainnet
+ * Supports: Arbitrum only
  */
 export const compoundBlock: BlockDefinition = {
     id: "compound",
@@ -20,6 +19,7 @@ export const compoundBlock: BlockDefinition = {
     nodeType: "compound",
     backendType: "LENDING",
     sharedConfigComponent: "lending",
+    supportedChains: ["ARBITRUM"],
     configComponentProps: {
         requiresAuth: true,
     },
@@ -29,7 +29,7 @@ export const compoundBlock: BlockDefinition = {
         status: "idle" as const,
         // Fixed provider for this block
         lendingProvider: LendingProvider.COMPOUND,
-        lendingChain: SupportedChain.ARBITRUM, // Only Arbitrum mainnet
+        lendingChain: "ARBITRUM",
         lendingOperation: LendingOperation.SUPPLY,
         // Asset configuration
         assetAddress: "",

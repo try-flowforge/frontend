@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { Eip1193Provider } from "ethers";
 import { BrowserProvider } from "ethers";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
-import { getSafeModuleAddress } from "@/web3/chains";
+import { getContractAddress } from "@/web3/config/contract-registry";
 import { getSafeModuleStatus } from "../utils/safe";
 
 // Hook to get the status of the Safe module for a given safe address
@@ -21,7 +21,7 @@ export function useSafeModuleStatus(
     }
     setLoading(true);
     try {
-      const moduleAddress = getSafeModuleAddress(chainId);
+      const moduleAddress = getContractAddress(chainId, "safeModule");
       if (!moduleAddress) {
         setStatus(null);
         return;

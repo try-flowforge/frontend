@@ -13,8 +13,8 @@ import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 import { useSafeWallets } from "@/web3/hooks/useSafeWallets";
 import { useCreateSafeWallet } from "@/web3/hooks/useCreateSafeWallet";
 import { useSafeModuleStatus } from "@/web3/hooks/useSafeModuleStatus";
-import { verifyModuleEnabled } from "@/web3/onboard-utils";
-import { useOnboarding } from "@/context/OnboardingContext";
+import { verifyModuleEnabled } from "@/onboarding/utils/safemodule-verifier";
+import { useOnboarding } from "@/onboarding/context/OnboardingContext";
 
 // Placeholder types - will be properly typed when we port the hooks
 export interface SafeWalletSelection {

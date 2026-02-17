@@ -1,29 +1,20 @@
-// Handles on-chain module verification with retry logic
-
+// Check for on-chain module verification with retry logic
 import { ethers } from "ethers";
 import SafeArtifact from "@/web3/artifacts/Safe.json";
-import { getSafeModuleAddress } from "@/web3/chains";
+import { getContractAddress } from "@/web3/config/contract-registry";
 
-/**
- * Verify that module is enabled for a Safe (with retry logic)
- * @param safeAddress - Safe wallet address
- * @param chainId - Chain ID
- * @param provider - Ethereum provider
- * @param maxRetries - Maximum number of retries (default 3)
- * @param delayMs - Delay between retries in ms (default 2000)
- * @returns true if module is enabled, false otherwise
- */
+// Verify that module is enabled for a Safe (with retry logic)
 export async function verifyModuleEnabled(
   safeAddress: string,
-  chainId: number,
+  identifier: string | number,
   provider: ethers.Eip1193Provider,
   maxRetries: number = 3,
   delayMs: number = 2000,
 ): Promise<boolean> {
-  const moduleAddress = getSafeModuleAddress(chainId);
+  const moduleAddress = getContractAddress(identifier, "safeModule");
 
   if (!moduleAddress) {
-    throw new Error(`Module address not configured for chain ${chainId}`);
+    throw new Error(`Module address not configured for chain ${identifier}`);
   }
 
   const ethersProvider = new ethers.BrowserProvider(provider);
@@ -39,20 +30,19 @@ export async function verifyModuleEnabled(
     try {
       const isEnabled: boolean =
         await safeContract.isModuleEnabled(moduleAddress);
-      return isEnabled;
+
+      if (isEnabled) return true;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+    }
 
-      // If not the last attempt, wait before retrying
-      if (attempt < maxRetries - 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, delayMs * Math.pow(1.5, attempt)),
-        );
-      }
+    // Wait and retry
+    if (attempt < maxRetries - 1) {
+      const waitTime = delayMs * Math.pow(1.5, attempt);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
   }
 
-  // All retries failed
   throw new Error(
     `Failed to verify module status after ${maxRetries} attempts: ${lastError?.message || "Unknown error"}`,
   );

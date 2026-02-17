@@ -1,15 +1,15 @@
 /**
  * Swap Types - Frontend type definitions for swap functionality
  * These types mirror the backend swap.types.ts for consistency
+ *
+ * Chain-related data has been moved to:
+ *   - config/chain-registry.ts (chain metadata, labels, contracts)
+ *   - config/token-registry.ts (token lists per chain)
  */
 
-// Supported Chains
-export enum SupportedChain {
-    ARBITRUM = 'ARBITRUM',
-    ARBITRUM_SEPOLIA = 'ARBITRUM_SEPOLIA',
-    ETHEREUM_SEPOLIA = 'ETHEREUM_SEPOLIA',
-    BASE = 'BASE',
-}
+// ─── Re-export chain-related items from centralized registries ───────
+// These re-exports maintain backward compatibility for existing imports.
+export { getSwapTokensForChain as getTokensForChain } from "@/web3/config/token-registry";
 
 // Supported Swap Providers
 export enum SwapProvider {
@@ -44,7 +44,7 @@ export interface SwapInputConfig {
     walletAddress: string; // The wallet that will perform the swap
 
     // Optional: destination chain for cross-chain (e.g. LiFi)
-    toChain?: SupportedChain;
+    toChain?: string;
 
     // Optional fields with defaults
     slippageTolerance?: number; // Default: 0.5 (0.5%) - backend uses default if not provided
@@ -64,11 +64,11 @@ export interface SwapInputConfig {
 // Swap Node Configuration (matches backend SwapNodeConfig)
 export interface SwapNodeConfig {
     provider: SwapProvider;
-    chain: SupportedChain;
+    chain: string;
     inputConfig: SwapInputConfig;
 
     // Optional: destination chain for cross-chain (e.g. LiFi)
-    toChain?: SupportedChain;
+    toChain?: string;
 
     // Execution preferences
     simulateFirst?: boolean; // Default: true
@@ -79,7 +79,7 @@ export interface SwapNodeConfig {
 // Swap Quote Response
 export interface SwapQuote {
     provider: SwapProvider;
-    chain: SupportedChain;
+    chain: string;
     sourceToken: TokenInfo;
     destinationToken: TokenInfo;
     amountIn: string;
@@ -92,182 +92,21 @@ export interface SwapQuote {
     validUntil?: number; // Unix timestamp
 }
 
-// ============================================
-// TOKEN LISTS BY CHAIN
-// ============================================
-
 /**
- * Arbitrum Mainnet Tokens
- * Common tokens with verified Uniswap V3 liquidity
- */
-export const ARBITRUM_MAINNET_TOKENS: TokenInfo[] = [
-    {
-        address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
-        symbol: 'USDT',
-        decimals: 6,
-        name: 'Tether USD',
-    },
-    {
-        address: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
-        symbol: 'WBTC',
-        decimals: 8,
-        name: 'Wrapped BTC',
-    },
-    {
-        address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
-        symbol: 'DAI',
-        decimals: 18,
-        name: 'Dai Stablecoin',
-    },
-    {
-        address: '0x912CE59144191C1204E64559FE8253a0e49E6548',
-        symbol: 'ARB',
-        decimals: 18,
-        name: 'Arbitrum',
-    },
-];
-
-/**
- * Ethereum Sepolia Testnet Tokens
- * Standard token addresses on Ethereum Sepolia
- */
-export const ETHEREUM_SEPOLIA_TOKENS: TokenInfo[] = [
-    {
-        address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0x779877A7B0D9E8603169dddb7831e2F6F0dE442f',
-        symbol: 'LINK',
-        decimals: 18,
-        name: 'Chainlink Token',
-    },
-];
-
-/**
- * Arbitrum Sepolia Testnet Tokens
- * Tokens with verified Uniswap V3 pools on Sepolia testnet
- * These are official testnet token addresses
- */
-export const ARBITRUM_SEPOLIA_TOKENS: TokenInfo[] = [
-    {
-        address: '0x980B62Da83eFf3D4576C647993b0c1D7faf17c73',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0xb1D4538B4571d411F07960EF2838Ce337FE1E80E',
-        symbol: 'LINK',
-        decimals: 18,
-        name: 'Chainlink Token',
-    }
-];
-
-/**
- * Base Mainnet Tokens (for LiFi cross-chain)
- */
-export const BASE_MAINNET_TOKENS: TokenInfo[] = [
-    {
-        address: '0x4200000000000000000000000000000000000006',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
-        symbol: 'DAI',
-        decimals: 18,
-        name: 'Dai Stablecoin',
-    },
-    {
-        address: '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA',
-        symbol: 'USDbC',
-        decimals: 6,
-        name: 'USD Base Coin',
-    },
-];
-
-/**
- * Legacy export for backward compatibility
- * @deprecated Use getTokensForChain() instead
- */
-export const ARBITRUM_TOKENS = ARBITRUM_MAINNET_TOKENS;
-
-/**
- * Special constant for custom token selection (mainnet only)
+ * Special constant for custom token selection
  */
 export const CUSTOM_TOKEN_OPTION = '__CUSTOM_TOKEN__';
-
-/**
- * Get tokens for a specific chain
- * @param chain - The chain to get tokens for
- * @returns Array of TokenInfo for the specified chain
- */
-export function getTokensForChain(chain: SupportedChain): TokenInfo[] {
-    switch (chain) {
-        case SupportedChain.ARBITRUM:
-            return ARBITRUM_MAINNET_TOKENS;
-        case SupportedChain.ARBITRUM_SEPOLIA:
-            return ARBITRUM_SEPOLIA_TOKENS;
-        case SupportedChain.ETHEREUM_SEPOLIA:
-            return ETHEREUM_SEPOLIA_TOKENS;
-        case SupportedChain.BASE:
-            return BASE_MAINNET_TOKENS;
-        default:
-            return ARBITRUM_MAINNET_TOKENS;
-    }
-}
 
 /**
  * Check if custom token input is allowed for a chain
  * Mainnet allows custom tokens, testnet doesn't (limited liquidity)
  */
 //eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function allowsCustomTokens(_chain: SupportedChain): boolean {
+export function allowsCustomTokens(_chain: string): boolean {
     return true; // Enable custom tokens for all chains as per user request
 }
 
 // Display labels for enums
-export const CHAIN_LABELS: Record<SupportedChain, string> = {
-    [SupportedChain.ARBITRUM]: 'Arbitrum',
-    [SupportedChain.ARBITRUM_SEPOLIA]: 'Arbitrum Sepolia',
-    [SupportedChain.ETHEREUM_SEPOLIA]: 'Ethereum Sepolia',
-    [SupportedChain.BASE]: 'Base',
-};
-
 export const PROVIDER_LABELS: Record<SwapProvider, string> = {
     [SwapProvider.UNISWAP]: 'Uniswap',
     [SwapProvider.UNISWAP_V4]: 'Uniswap V4',
@@ -283,20 +122,3 @@ export const SWAP_TYPE_LABELS: Record<SwapType, string> = {
 
 // Slippage presets
 export const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0, 2.5];
-
-// Default swap configuration (default chain: Arbitrum Sepolia)
-export const DEFAULT_SWAP_CONFIG: Partial<SwapNodeConfig> = {
-    provider: SwapProvider.UNISWAP,
-    chain: SupportedChain.ARBITRUM_SEPOLIA,
-    simulateFirst: true,
-    autoRetryOnFailure: true,
-    maxRetries: 3,
-    inputConfig: {
-        sourceToken: ARBITRUM_SEPOLIA_TOKENS[1], // USDC
-        destinationToken: ARBITRUM_SEPOLIA_TOKENS[0], // WETH
-        amount: '',
-        swapType: SwapType.EXACT_INPUT,
-        walletAddress: '',
-        slippageTolerance: 0.5,
-    },
-};

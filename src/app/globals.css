@@ -19,6 +19,41 @@ body {
     "calt" 1;
 }
 
+/* Privy CSS Override Variables for all customization */
+
+:root {
+  /* Customize the border radius for modals and buttons */
+  --privy-border-radius-sm: 8px;
+  --privy-border-radius-md: 12px;
+  --privy-border-radius-lg: 16px;
+  --privy-border-radius-full: 9999px;
+
+  /* Customize font stack */
+  --privy-font-family: inherit;
+
+  /* Color overrides */
+  --privy-color-background: #09090b;
+  --privy-color-background-2: #18181b;
+  --privy-color-background-3: #27272a;
+
+  --privy-color-foreground: #ffffff;
+  --privy-color-foreground-2: #a1a1aa;
+  --privy-color-foreground-3: #52525b;
+  --privy-color-foreground-4: #3f3f46;
+
+  --privy-color-foreground-accent: #ffffff;
+
+  --privy-color-accent: #FF6500;
+  --privy-color-accent-light: #ff7a24;
+  --privy-color-accent-lightest: #ffa366;
+  --privy-color-accent-dark: #cc5100;
+  --privy-color-accent-darkest: #993d00;
+
+  --privy-color-success: #22c55e;
+  --privy-color-error: #ef4444;
+  --privy-color-error-light: #f87171;
+}
+
 /* Custom scrollbar for dark theme */
 .scrollbar-thin::-webkit-scrollbar {
   width: 8px;

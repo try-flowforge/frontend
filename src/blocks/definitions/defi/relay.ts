@@ -1,13 +1,13 @@
 import type { BlockDefinition } from "../../types";
 import {
     SwapProvider,
-    SupportedChain,
     SwapType,
 } from "@/types/swap";
 
 /**
  * Relay Swap Block Definition
  * Allows users to perform cross-chain swaps via Relay
+ * Supports: Arbitrum, Arbitrum Sepolia
  */
 export const relayBlock: BlockDefinition = {
     id: "relay",
@@ -18,6 +18,7 @@ export const relayBlock: BlockDefinition = {
     nodeType: "relay",
     backendType: "SWAP",
     sharedConfigComponent: "swap",
+    supportedChains: ["ARBITRUM", "ARBITRUM_SEPOLIA"],
     configComponentProps: {
         requiresAuth: true,
         requiresForcedProvider: false,
@@ -28,7 +29,7 @@ export const relayBlock: BlockDefinition = {
         status: "idle" as const,
         // Fixed provider for this block
         swapProvider: SwapProvider.RELAY,
-        swapChain: SupportedChain.ARBITRUM,
+        swapChain: "ARBITRUM",
         swapType: SwapType.EXACT_INPUT,
         // Source token
         sourceTokenAddress: "",

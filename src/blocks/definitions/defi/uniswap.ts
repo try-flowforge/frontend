@@ -1,34 +1,35 @@
 import type { BlockDefinition } from "../../types";
 import {
     SwapProvider,
-    SupportedChain,
     SwapType,
 } from "@/types/swap";
 
 /**
  * Uniswap Swap Block Definition
- * Allows users to perform token swaps via Uniswap
+ * Allows users to perform token swaps via Uniswap V4
+ * Supports: Arbitrum, Arbitrum Sepolia
  */
 export const uniswapBlock: BlockDefinition = {
     id: "uniswap",
     label: "Uniswap",
     iconName: "UniswapLogo",
-    description: "Swap tokens via Uniswap DEX",
+    description: "Swap tokens via Uniswap V4",
     category: "defi",
     nodeType: "uniswap",
     backendType: "SWAP",
     sharedConfigComponent: "swap",
+    supportedChains: ["ARBITRUM", "ARBITRUM_SEPOLIA"],
     configComponentProps: {
         requiresAuth: true,
         requiresForcedProvider: false,
     },
     defaultData: {
         label: "Uniswap Swap",
-        description: "Swap tokens via Uniswap",
+        description: "Swap tokens via Uniswap V4",
         status: "idle" as const,
-        // Fixed provider for this block (V4: Quoter + Universal Router + Permit2)
+        // Fixed provider for this block
         swapProvider: SwapProvider.UNISWAP_V4,
-        swapChain: SupportedChain.ARBITRUM,
+        swapChain: "ARBITRUM",
         swapType: SwapType.EXACT_INPUT,
         // Source token
         sourceTokenAddress: "",

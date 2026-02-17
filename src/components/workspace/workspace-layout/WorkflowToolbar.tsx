@@ -261,7 +261,7 @@ export const WorkflowToolbar = React.memo(function WorkflowToolbar({
               </div>
             ) : (
               <Button
-                onClick={login}
+                onClick={() => login({ loginMethods: ['email'] })}
                 title="Login / Sign Up"
               >
                 <LuLogIn className="w-4 h-4" aria-hidden="true" />

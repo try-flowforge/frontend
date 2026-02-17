@@ -1,35 +1,36 @@
 import type { BlockDefinition } from "../../types";
 import {
     SwapProvider,
-    SupportedChain,
     SwapType,
 } from "@/types/swap";
 
 /**
  * LI.FI Swap Block Definition
- * Allows users to perform swaps via LI.FI DEX aggregator
+ * Allows users to perform same-chain and cross-chain swaps via LI.FI
+ * Supports: Arbitrum, Base (cross-chain between them)
  */
 export const lifiBlock: BlockDefinition = {
     id: "lifi",
     label: "LI.FI",
     iconName: "LiFiLogo",
-    description: "DEX aggregator for optimal swap routes",
+    description: "Cross-chain swaps via LI.FI aggregator",
     category: "defi",
     nodeType: "lifi",
     backendType: "SWAP",
     sharedConfigComponent: "swap",
+    supportedChains: ["ARBITRUM"],
     configComponentProps: {
         requiresAuth: true,
-        requiresForcedProvider: true, // LiFi needs forcedProvider prop
+        requiresForcedProvider: false,
     },
     defaultData: {
         label: "LI.FI Swap",
-        description: "Swap via LI.FI aggregator",
+        description: "Cross-chain swap via LI.FI",
         status: "idle" as const,
         // Fixed provider for this block
         swapProvider: SwapProvider.LIFI,
-        swapChain: SupportedChain.ARBITRUM,
-        swapToChain: SupportedChain.BASE,
+        swapChain: "ARBITRUM",
+        swapToChain: "ARBITRUM",
         swapType: SwapType.EXACT_INPUT,
         // Source token
         sourceTokenAddress: "",

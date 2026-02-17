@@ -1,13 +1,16 @@
 /**
  * Oracle API Client
  * Functions to interact with the oracle backend API
+ *
+ * Chain-related types are now plain strings — chain labels
+ * come from the centralized chain-registry.
  */
 
 import { api } from "@/lib/api-client";
 import { API_CONFIG } from "@/config/api";
+import { getChain } from "@/web3/config/chain-registry";
 
 export type OracleProvider = "CHAINLINK" | "PYTH";
-export type OracleChain = "ARBITRUM" | "ARBITRUM_SEPOLIA" | "ETHEREUM_SEPOLIA";
 export type FeedCategory = "crypto" | "forex" | "commodities";
 
 export interface PriceFeed {
@@ -26,7 +29,7 @@ export interface ChainlinkConfig {
   name: string;
   category: FeedCategory;
   provider: "CHAINLINK";
-  chain: OracleChain;
+  chain: string;
   aggregatorAddress: string;
 }
 
@@ -35,7 +38,7 @@ export interface PythConfig {
   name: string;
   category: FeedCategory;
   provider: "PYTH";
-  chain: OracleChain;
+  chain: string;
   priceFeedId: string;
 }
 
@@ -46,7 +49,7 @@ export type OracleConfig = ChainlinkConfig | PythConfig;
  */
 export async function fetchAvailableFeeds(
   provider: OracleProvider,
-  chain: OracleChain,
+  chain: string,
 ): Promise<PriceFeedListResponse | null> {
   try {
     const url = `${API_CONFIG.ENDPOINTS.ORACLE.FEEDS}?provider=${provider}&chain=${chain}`;
@@ -56,10 +59,8 @@ export async function fetchAvailableFeeds(
       return response.data.data;
     }
 
-    // console.error("Failed to fetch feeds:", response.error);
     return null;
   } catch {
-    // console.error("Error fetching feeds:", error);
     return null;
   }
 }
@@ -70,7 +71,7 @@ export async function fetchAvailableFeeds(
 export async function fetchOracleConfig(
   symbol: string,
   provider: OracleProvider,
-  chain: OracleChain,
+  chain: string,
 ): Promise<OracleConfig | null> {
   try {
     const encodedSymbol = encodeURIComponent(symbol);
@@ -81,10 +82,8 @@ export async function fetchOracleConfig(
       return response.data.data;
     }
 
-    // console.error("Failed to fetch oracle config:", response.error);
     return null;
   } catch {
-    // console.error("Error fetching oracle config:", error);
     return null;
   }
 }
@@ -108,15 +107,11 @@ export function groupFeedsByCategory(
 }
 
 /**
- * Get chain label for display
+ * Get chain label for display.
+ * Uses centralized CHAIN_LABELS from chain-registry.
  */
-export function getChainLabel(chain: OracleChain): string {
-  const labels: Record<OracleChain, string> = {
-    ARBITRUM: "Arbitrum One (Mainnet)",
-    ARBITRUM_SEPOLIA: "Arbitrum Sepolia (Testnet)",
-    ETHEREUM_SEPOLIA: "Ethereum Sepolia (Testnet)",
-  };
-  return labels[chain];
+export function getChainLabel(chain: string): string {
+  return getChain(chain)?.name ?? chain;
 }
 
 /**

@@ -1,19 +1,21 @@
 import type { BlockDefinition } from "../../types";
-import { OracleProvider, OracleChain } from "@/types/oracle";
+import { OracleProvider } from "@/types/oracle";
 
 /**
  * Chainlink Oracle Block Definition
- * Allows users to fetch price data and other oracle services from Chainlink
+ * Allows users to fetch verifiable price data from Chainlink Data Feeds
+ * Supports: Arbitrum, Arbitrum Sepolia
  */
 export const chainlinkBlock: BlockDefinition = {
     id: "chainlink",
     label: "Chainlink",
     iconName: "ChainlinkLogo",
-    description: "Industry-standard price feeds, VRF, and automation",
+    description: "Decentralized oracle price feeds",
     category: "oracle",
     nodeType: "chainlink",
-    backendType: "CHAINLINK_PRICE_ORACLE",
+    backendType: "PRICE_ORACLE",
     sharedConfigComponent: "oracle",
+    supportedChains: ["ARBITRUM", "ARBITRUM_SEPOLIA"],
     configComponentProps: {
         requiresAuth: true,
     },
@@ -23,7 +25,7 @@ export const chainlinkBlock: BlockDefinition = {
         status: "idle" as const,
         // Oracle configuration
         oracleProvider: OracleProvider.CHAINLINK,
-        oracleChain: OracleChain.ARBITRUM_SEPOLIA,
+        oracleChain: "ARBITRUM_SEPOLIA",
         // Chainlink specific
         aggregatorAddress: "",
         selectedPriceFeed: "",
@@ -34,7 +36,6 @@ export const chainlinkBlock: BlockDefinition = {
         priceData: "",
         formattedPrice: "",
         timestamp: "",
-        decimals: undefined,
         // Execution settings
         simulateFirst: true,
         lastFetchedAt: "",

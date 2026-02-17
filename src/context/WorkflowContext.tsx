@@ -22,12 +22,12 @@ import { generateIconRegistry } from "@/blocks/registry";
 import type { BlockDefinition } from "@/blocks/types";
 import { BlockProvider, useBlock } from "@/blocks/context";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
-// import { isTestnet, isMainnet, CHAIN_IDS } from "@/web3/chains";
 import { SaveWorkflowModal } from "@/components/workspace/SaveWorkflowModal";
 import { useCanvasDimensions } from "@/hooks/useCanvasDimensions";
 import { useUnsavedChanges } from "@/hooks/useWorkflowState";
 import { calculateCanvasCenter } from "@/utils/canvas";
-import { saveWorkflow, saveAndExecuteWorkflow, getWorkflow, transformWorkflowToCanvas } from "../utils/workflow-api";
+import { saveWorkflow, saveAndExecuteWorkflow, getWorkflow, transformWorkflowToCanvas, validateWorkflow } from "../utils/workflow-api";
+import { useToast } from "@/context/ToastContext";
 import { LuSquareCheck, LuClock } from "react-icons/lu";
 
 // The Start node ID - used to identify and protect it from deletion
@@ -174,6 +174,7 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const { getBlockById } = useBlock();
+  const toast = useToast();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
@@ -317,13 +318,13 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
   const handleSave = useCallback(async () => {
     // Check if user is authenticated
     if (!authenticated) {
-      // alert("Please log in to save workflows");
+      toast.warning("Login Required", "Please log in to save workflows.");
       return;
     }
 
     // Open the save modal
     setShowSaveModal(true);
-  }, [authenticated]);
+  }, [authenticated, toast]);
 
   const handleSaveConfirm = useCallback(async (params: {
     workflowName: string;
@@ -334,7 +335,7 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
     // Get the access token
     const accessToken = await getPrivyAccessToken();
     if (!accessToken) {
-      // alert("Unable to authenticate. Please try logging in again.");
+      toast.error("Authentication Required", "Unable to authenticate. Please try logging in again.");
       setShowSaveModal(false);
       return;
     }
@@ -343,12 +344,23 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
     setShowSaveModal(false);
 
     try {
+      // Validate workflow before saving
+      const validation = await validateWorkflow({
+        accessToken,
+        nodes,
+        edges,
+      });
 
+      if (!validation.valid) {
+        toast.warning("Workflow Validation Failed", validation.message, 6000);
+        setIsSaving(false);
+        return;
+      }
 
       const result = await saveWorkflow({
         workflowId: currentWorkflowId,
         accessToken,
-        name: params.workflowName, // Use the workflow name from modal
+        name: params.workflowName,
         description: params.description,
         tags: params.tags,
         nodes,
@@ -358,51 +370,59 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
 
       if (result.success) {
         setLastSaved(new Date());
-        setWorkflowName(params.workflowName); // Update context with new name
+        setWorkflowName(params.workflowName);
         if (result.workflowId && !currentWorkflowId) {
           setCurrentWorkflowId(result.workflowId);
         }
-        // Increment version after save (backend increments on update)
         if (result.data?.version) {
           setWorkflowVersion(result.data.version);
         } else if (currentWorkflowId) {
-          // If updating existing workflow, increment local version
           setWorkflowVersion((prev) => prev + 1);
         }
-        // console.log("Workflow saved successfully!", result);
+        toast.success("Workflow Saved", `"${params.workflowName}" saved successfully.`);
       } else {
-        // console.error("Failed to save workflow:", result.error);
-        // alert(`Failed to save workflow: ${result.error?.message || "Unknown error"}`);
+        toast.error("Save Failed", result.error?.message || "An unknown error occurred while saving.");
       }
     } catch {
-      // console.error("Error saving workflow:", error);
-      // alert(`Error saving workflow: ${error instanceof Error ? error.message : String(error)}`);
+      toast.error("Save Error", "An unexpected error occurred. Please try again.");
     } finally {
       setIsSaving(false);
     }
-  }, [nodes, edges, currentWorkflowId, getPrivyAccessToken]);
+  }, [nodes, edges, currentWorkflowId, getPrivyAccessToken, toast]);
 
   const handleRun = useCallback(() => {
     const executeWorkflowHandler = async () => {
       try {
-        // console.log("Running workflow...", { nodes, edges });
-
         // Check if user is authenticated
         if (!authenticated) {
-          // alert("Please log in to run workflows");
+          toast.warning("Login Required", "Please log in to run workflows.");
           return;
         }
 
         // Get the access token
         const accessToken = await getPrivyAccessToken();
         if (!accessToken) {
-          // alert("Unable to authenticate. Please try logging in again.");
+          toast.error("Authentication Required", "Unable to authenticate. Please try logging in again.");
           return;
         }
 
+        // Validate workflow before running
+        const validation = await validateWorkflow({
+          accessToken,
+          nodes,
+          edges,
+        });
+
+        if (!validation.valid) {
+          toast.warning("Cannot Run Workflow", validation.message, 6000);
+          return;
+        }
+
+        toast.info("Running Workflow", "Executing your workflow...");
+
         const result = await saveAndExecuteWorkflow({
           accessToken,
-          workflowName: `Workflow ${new Date().toLocaleDateString()}`,
+          workflowName: workflowName || `Workflow ${new Date().toLocaleDateString()}`,
           nodes,
           edges,
           initialInput: {
@@ -413,34 +433,17 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
         });
 
         if (result.success) {
-          // console.log("Workflow executed successfully!", result);
-          // alert(
-          //   `Workflow executed successfully!\n\n` +
-          //   `Workflow ID: ${result.workflowId}\n` +
-          //   `Execution ID: ${result.executionId}\n` +
-          //   `Status: ${result.data?.status || "PENDING"}\n\n` +
-          //   `Check backend logs for execution trace.`
-          // );
+          toast.success("Workflow Running", `Execution started. ID: ${result.executionId?.slice(0, 8)}...`);
         } else {
-          // console.error("Workflow execution failed:", result.error);
-          // alert(
-          //   `Workflow execution failed!\n\n` +
-          //   `Error: ${result.error?.message || "Unknown error"}\n\n` +
-          //   `Make sure the backend is running`
-          // );
+          toast.error("Execution Failed", result.error?.message || "An unknown error occurred.");
         }
       } catch {
-        // console.error("Failed to execute workflow:", error);
-        // alert(
-        //   `Failed to execute workflow!\n\n` +
-        //   `Error: ${error instanceof Error ? error.message : String(error)}\n\n` +
-        //   `Is the backend running?`
-        // );
+        toast.error("Execution Error", "An unexpected error occurred. Is the backend running?");
       }
     };
 
     executeWorkflowHandler();
-  }, [nodes, edges, authenticated, getPrivyAccessToken]);
+  }, [nodes, edges, authenticated, getPrivyAccessToken, workflowName, toast]);
 
   // Load workflow from backend
   const loadWorkflow = useCallback(async (workflowId: string): Promise<boolean> => {

@@ -1,9 +1,10 @@
 import type { BlockDefinition } from "../../types";
-import { OracleProvider, OracleChain } from "@/types/oracle";
+import { OracleProvider } from "@/types/oracle";
 
 /**
  * Pyth Network Oracle Block Definition
  * Allows users to fetch low-latency price data from Pyth Network
+ * Supports: Arbitrum, Arbitrum Sepolia
  */
 export const pythBlock: BlockDefinition = {
     id: "pyth",
@@ -14,6 +15,7 @@ export const pythBlock: BlockDefinition = {
     nodeType: "pyth",
     backendType: "PYTH_PRICE_ORACLE",
     sharedConfigComponent: "oracle",
+    supportedChains: ["ARBITRUM", "ARBITRUM_SEPOLIA"],
     configComponentProps: {
         requiresAuth: true,
     },
@@ -23,7 +25,7 @@ export const pythBlock: BlockDefinition = {
         status: "idle" as const,
         // Oracle configuration
         oracleProvider: OracleProvider.PYTH,
-        oracleChain: OracleChain.ARBITRUM_SEPOLIA,
+        oracleChain: "ARBITRUM_SEPOLIA",
         // Pyth specific
         priceFeedId: "",
         selectedPriceFeed: "",

@@ -1,17 +1,19 @@
 /**
  * Oracle Type Definitions
  * Types for Chainlink and Pyth Network oracle integrations
+ *
+ * Chain-related data has been moved to:
+ *   - config/chain-registry.ts (chain metadata, labels)
+ *
+ * Note: OracleChain enum has been removed. Use string chain IDs
+ * from chain-registry (e.g. "ARBITRUM", "ARBITRUM_SEPOLIA").
  */
+
+
 
 export enum OracleProvider {
     CHAINLINK = "CHAINLINK",
     PYTH = "PYTH",
-}
-
-export enum OracleChain {
-    ARBITRUM = "ARBITRUM",
-    ARBITRUM_SEPOLIA = "ARBITRUM_SEPOLIA",
-    ETHEREUM_SEPOLIA = "ETHEREUM_SEPOLIA",
 }
 
 /**
@@ -20,7 +22,8 @@ export enum OracleChain {
 export interface ChainlinkPriceFeed {
     symbol: string;
     address: string;
-    chain: OracleChain;
+    /** Chain ID from chain-registry (e.g. "ARBITRUM", "ARBITRUM_SEPOLIA") */
+    chain: string;
     description: string;
 }
 
@@ -28,50 +31,26 @@ export const CHAINLINK_PRICE_FEEDS: ChainlinkPriceFeed[] = [
     {
         symbol: "ETH/USD",
         address: "0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165",
-        chain: OracleChain.ARBITRUM_SEPOLIA,
+        chain: "ARBITRUM_SEPOLIA",
         description: "Ethereum / US Dollar",
     },
     {
         symbol: "ARB/USD",
         address: "0xD1092a65338d049DB68D7Be6bD89d17a0929945e",
-        chain: OracleChain.ARBITRUM_SEPOLIA,
+        chain: "ARBITRUM_SEPOLIA",
         description: "Arbitrum / US Dollar",
     },
     {
         symbol: "AAVE/USD",
         address: "0x20b1061Acd37302925D9A8c3fD94eb765039dBd5",
-        chain: OracleChain.ARBITRUM_SEPOLIA,
+        chain: "ARBITRUM_SEPOLIA",
         description: "Aave / US Dollar",
     },
     {
         symbol: "ETH/USD",
         address: "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
-        chain: OracleChain.ARBITRUM,
+        chain: "ARBITRUM",
         description: "Ethereum / US Dollar",
-    },
-    {
-        symbol: "ETH/USD",
-        address: "0x694AA1769357215DE4FAC081bf1f309aDC325306",
-        chain: OracleChain.ETHEREUM_SEPOLIA,
-        description: "Ethereum / US Dollar",
-    },
-    {
-        symbol: "BTC/USD",
-        address: "0x1b44F3514812d835EB1B450AFB6BC2d37093bF56",
-        chain: OracleChain.ETHEREUM_SEPOLIA,
-        description: "Bitcoin / US Dollar",
-    },
-    {
-        symbol: "USDC/USD",
-        address: "0xA2F78ab2355fe2f984D808B5CeE7FD964A160109",
-        chain: OracleChain.ETHEREUM_SEPOLIA,
-        description: "USD Coin / US Dollar",
-    },
-    {
-        symbol: "LINK/USD",
-        address: "0xc59E3633BAAC77393d640F2Be3F7246B906e050",
-        chain: OracleChain.ETHEREUM_SEPOLIA,
-        description: "Chainlink / US Dollar",
     },
 ];
 
@@ -115,7 +94,7 @@ export const PYTH_PRICE_FEEDS: PythPriceFeed[] = [
 /**
  * Helper function to get Chainlink feeds for a specific chain
  */
-export function getChainlinkFeedsForChain(chain: OracleChain): ChainlinkPriceFeed[] {
+export function getChainlinkFeedsForChain(chain: string): ChainlinkPriceFeed[] {
     return CHAINLINK_PRICE_FEEDS.filter(feed => feed.chain === chain);
 }
 
@@ -132,13 +111,3 @@ export function isValidEthereumAddress(address: string): boolean {
 export function isValidPythFeedId(feedId: string): boolean {
     return /^0x[a-fA-F0-9]{64}$/.test(feedId);
 }
-
-/**
- * Chain labels for display
- */
-export const ORACLE_CHAIN_LABELS: Record<OracleChain, string> = {
-    [OracleChain.ARBITRUM]: "Arbitrum",
-    [OracleChain.ARBITRUM_SEPOLIA]: "Arbitrum Sepolia (Testnet)",
-    [OracleChain.ETHEREUM_SEPOLIA]: "Ethereum Sepolia (Testnet)",
-};
-

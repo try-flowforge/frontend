@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Hubot_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import ProvidersWrapper from "./providers-wrapper";
+import ProvidersWrapper from "@/providers/providers-wrapper";
 
 const fontSans = Hubot_Sans({
   variable: "--font-sans",

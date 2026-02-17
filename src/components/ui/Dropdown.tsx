@@ -19,8 +19,8 @@ export interface DropdownProps
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
-const Dropdown = React.forwardRef<HTMLSelectElement, DropdownProps>(
-  ({ className, error, label, options, value, onChange, disabled, placeholder, ...props }) => {
+const Dropdown = React.forwardRef<HTMLDivElement, DropdownProps>(
+  ({ className, error, label, options, value, onChange, disabled, placeholder, ...props }, ref) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +57,7 @@ const Dropdown = React.forwardRef<HTMLSelectElement, DropdownProps>(
     };
 
     return (
-      <div className="w-full">
+      <div className="w-full" ref={ref}>
         {label && (
           <label className="block mb-1.5">
             <span className="text-xs text-muted-foreground">{label}</span>

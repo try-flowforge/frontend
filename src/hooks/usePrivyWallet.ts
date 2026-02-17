@@ -25,8 +25,9 @@ export function usePrivyWallet() {
   // useWallets() may include injected browser wallets (e.g. MetaMask extension)
   // that are detected but NOT linked (linked === false). The backend reads
   // user.linkedAccounts, so the frontend must use the same set for consistency.
-  const linkedWallets = wallets.filter((w) => w.linked);
   // Canonical wallet: prefer external (user chose "Connect existing") else embedded
+  // We include privy wallets even if 'linked' is false momentarily during creation/login
+  const linkedWallets = wallets.filter((w) => w.linked || w.walletClientType === "privy");
   const externalWallet = linkedWallets.find((w) => w.walletClientType !== "privy");
   const embeddedWallet = linkedWallets.find((w) => w.walletClientType === "privy");
   const wallet = externalWallet ?? embeddedWallet;

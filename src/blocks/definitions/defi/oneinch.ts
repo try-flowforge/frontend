@@ -1,13 +1,13 @@
 import type { BlockDefinition } from "../../types";
 import {
     SwapProvider,
-    SupportedChain,
     SwapType,
 } from "@/types/swap";
 
 /**
  * 1inch Swap Block Definition
  * Allows users to perform token swaps via 1inch aggregator
+ * Supports: Arbitrum only
  */
 export const oneInchBlock: BlockDefinition = {
     id: "oneinch",
@@ -18,6 +18,7 @@ export const oneInchBlock: BlockDefinition = {
     nodeType: "oneinch",
     backendType: "SWAP",
     sharedConfigComponent: "swap",
+    supportedChains: ["ARBITRUM"],
     configComponentProps: {
         requiresAuth: true,
         requiresForcedProvider: false,
@@ -28,7 +29,7 @@ export const oneInchBlock: BlockDefinition = {
         status: "idle" as const,
         // Fixed provider for this block
         swapProvider: SwapProvider.ONEINCH,
-        swapChain: SupportedChain.ARBITRUM,
+        swapChain: "ARBITRUM",
         swapType: SwapType.EXACT_INPUT,
         // Source token
         sourceTokenAddress: "",

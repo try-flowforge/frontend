@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 import { ethers } from "ethers";
-import { getSafeWalletFactoryAddress } from "@/web3/chains";
+import { getContractAddress } from "@/web3/config/contract-registry";
 import TriggerXSafeFactoryArtifact from "../artifacts/SafeFactory.json";
 
 export const useSafeWallets = () => {
@@ -20,7 +20,7 @@ export const useSafeWallets = () => {
     setError(null);
 
     try {
-      const factoryAddress = getSafeWalletFactoryAddress(chainId);
+      const factoryAddress = getContractAddress(chainId, "safeWalletFactory");
       if (!factoryAddress) {
         throw new Error(
           "Safe Wallet Factory address not configured for this network",

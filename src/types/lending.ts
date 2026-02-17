@@ -1,13 +1,15 @@
 /**
  * Lending Types - Frontend type definitions for lending functionality
  * These types mirror the backend lending.types.ts for consistency
- * Note: Only Arbitrum mainnet is supported for lending
+ *
+ * Chain-related data has been moved to:
+ *   - config/chain-registry.ts (chain metadata, labels)
+ *   - config/token-registry.ts (token lists per chain/provider)
  */
 
-import { SupportedChain } from './swap';
-
-// Re-export SupportedChain for convenience
-export { SupportedChain };
+// Re-export chain labels and lending token helper from registries
+import { getLendingTokens } from "@/web3/config/token-registry";
+export { getLendingTokens };
 
 // Supported Lending Providers
 export enum LendingProvider {
@@ -79,7 +81,7 @@ export interface LendingPosition {
 // Lending Quote Response
 export interface LendingQuote {
     provider: LendingProvider;
-    chain: SupportedChain;
+    chain: string;
     operation: LendingOperation;
     asset: LendingTokenInfo;
     amount: string;
@@ -136,142 +138,24 @@ export interface LendingAccountData {
     healthFactor: string;
 }
 
-// ============================================
-// TOKEN LISTS FOR LENDING (ARBITRUM MAINNET ONLY)
-// ============================================
-
 /**
- * Common tokens supported in Aave V3 on Arbitrum
- */
-export const AAVE_ARBITRUM_TOKENS: LendingTokenInfo[] = [
-    {
-        address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9',
-        symbol: 'USDT',
-        decimals: 6,
-        name: 'Tether USD',
-    },
-    {
-        address: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
-        symbol: 'WBTC',
-        decimals: 8,
-        name: 'Wrapped BTC',
-    },
-    {
-        address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
-        symbol: 'DAI',
-        decimals: 18,
-        name: 'Dai Stablecoin',
-    },
-    {
-        address: '0x912CE59144191C1204E64559FE8253a0e49E6548',
-        symbol: 'ARB',
-        decimals: 18,
-        name: 'Arbitrum',
-    },
-    {
-        address: '0x5979D7b546E38E414F7E9822514be443A4800529',
-        symbol: 'wstETH',
-        decimals: 18,
-        name: 'Wrapped stETH',
-    },
-];
-
-/**
- * Common tokens supported in Compound V3 on Arbitrum
- * Compound V3 uses USDC as the base asset
- */
-export const COMPOUND_ARBITRUM_TOKENS: LendingTokenInfo[] = [
-    {
-        address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin (Base Asset)',
-    },
-    {
-        address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether (Collateral)',
-    },
-    {
-        address: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f',
-        symbol: 'WBTC',
-        decimals: 8,
-        name: 'Wrapped BTC (Collateral)',
-    },
-    {
-        address: '0x912CE59144191C1204E64559FE8253a0e49E6548',
-        symbol: 'ARB',
-        decimals: 18,
-        name: 'Arbitrum (Collateral)',
-    },
-];
-
-/**
- * Common tokens supported in Aave V3 on Ethereum Sepolia
- */
-export const AAVE_ETHEREUM_SEPOLIA_TOKENS: LendingTokenInfo[] = [
-    {
-        address: '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
-        symbol: 'WETH',
-        decimals: 18,
-        name: 'Wrapped Ether',
-    },
-    {
-        address: '0x94a9D9AC8a2410350168e3d824A2207D9d6AB272',
-        symbol: 'USDC',
-        decimals: 6,
-        name: 'USD Coin',
-    },
-    {
-        address: '0xFF34B24F1890189744733173766BA299ad5c7730',
-        symbol: 'DAI',
-        decimals: 18,
-        name: 'Dai Stablecoin',
-    },
-];
-
-/**
- * Get tokens for a specific lending provider and chain
+ * Get tokens for a specific lending provider and chain.
+ * Delegates to the centralized token registry.
+ *
  * @param provider - The lending provider
- * @param chain - The supported chain
+ * @param chain - The chain ID (e.g. "ARBITRUM")
  * @returns Array of LendingTokenInfo
  */
-export function getLendingTokensForChain(provider: LendingProvider, chain: SupportedChain): LendingTokenInfo[] {
-    if (chain === SupportedChain.ETHEREUM_SEPOLIA) {
-        return provider === LendingProvider.AAVE ? AAVE_ETHEREUM_SEPOLIA_TOKENS : [];
-    }
-
-    // Default to Arbitrum
-    switch (provider) {
-        case LendingProvider.AAVE:
-            return AAVE_ARBITRUM_TOKENS;
-        case LendingProvider.COMPOUND:
-            return COMPOUND_ARBITRUM_TOKENS;
-        default:
-            return AAVE_ARBITRUM_TOKENS;
-    }
+export function getLendingTokensForChain(provider: LendingProvider, chain: string): LendingTokenInfo[] {
+    return getLendingTokens(provider, chain);
 }
 
 /**
- * Get tokens for a specific lending provider (Deprecated: use getLendingTokensForChain)
- * @param provider - The lending provider to get tokens for
- * @returns Array of LendingTokenInfo for the specified provider
+ * Get tokens for a specific lending provider (defaults to Arbitrum)
+ * @deprecated Use getLendingTokensForChain() instead
  */
 export function getTokensForLendingProvider(provider: LendingProvider): LendingTokenInfo[] {
-    return getLendingTokensForChain(provider, SupportedChain.ARBITRUM);
+    return getLendingTokensForChain(provider, "ARBITRUM");
 }
 
 // Display labels for enums
@@ -297,7 +181,7 @@ export const INTEREST_RATE_MODE_LABELS: Record<InterestRateMode, string> = {
 // Default lending configuration
 export const DEFAULT_LENDING_CONFIG = {
     provider: LendingProvider.AAVE,
-    chain: SupportedChain.ARBITRUM,
+    chain: "ARBITRUM",
     operation: LendingOperation.SUPPLY,
     simulateFirst: true,
     interestRateMode: InterestRateMode.VARIABLE,
