@@ -114,6 +114,25 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
     case "start":
       return {};
 
+    case "time-block":
+      return {
+        runAt: data.runAt,
+        timezone: data.timezone,
+        recurrence: {
+          type: data.recurrenceType || "NONE",
+          ...(data.recurrenceType === "INTERVAL" && data.intervalSeconds
+            ? { intervalSeconds: data.intervalSeconds }
+            : {}),
+          ...(data.recurrenceType === "CRON" && data.cronExpression
+            ? { cronExpression: data.cronExpression }
+            : {}),
+        },
+        stopConditions: {
+          ...(data.untilAt ? { untilAt: data.untilAt } : {}),
+          ...(typeof data.maxRuns === "number" ? { maxRuns: data.maxRuns } : {}),
+        },
+      };
+
     case "wallet-node":
       return {};
 

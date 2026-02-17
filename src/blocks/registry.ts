@@ -23,6 +23,7 @@ import { mailBlock } from "./definitions/social/mail";
 import { slackBlock } from "./definitions/social/slack";
 import { telegramBlock } from "./definitions/social/telegram";
 import { startBlock } from "./definitions/triggers/start";
+import { timeBlock } from "./definitions/triggers/time-block";
 import { walletBlock } from "./definitions/wallet/wallet";
 import { apiBlock } from "./definitions/general/api";
 
@@ -133,6 +134,7 @@ const STATIC_BLOCKS: BlockDefinition[] = [
   switchBlock,
   // Trigger blocks
   startBlock,
+  timeBlock,
   // Wallet blocks
   walletBlock,
   // General blocks

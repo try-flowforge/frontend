@@ -70,6 +70,8 @@ export function BaseNode({
 
   const handleLabel = getHandleLabel(nodeType, data);
 
+  const isTimeBlock = nodeType === "time-block" || data.blockId === "time-block";
+
   return (
     <div className={cn("relative group overflow-visible", hasEdges && "has-edges")}>
       {showHandles && (
@@ -89,19 +91,26 @@ export function BaseNode({
 
       <SimpleCard
         className={cn(
-          "w-16 h-16 transition-all relative",
+          "w-20 h-20 transition-all relative",
           "border border-white/10 bg-white/5 rounded-lg",
           selected && "ring-0.5 ring-white/30 border-white/40 shadow-md"
         )}
       >
         {/* Icon container */}
-        <div className="flex items-center justify-center p-2 w-full h-full">
+        <div className="flex flex-col items-center justify-center p-2 w-full h-full gap-1">
           {renderedIcon ? (
-            <div className="w-full h-full flex items-center justify-center rounded-lg bg-background">
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-background">
               {renderedIcon}
             </div>
           ) : (
-            <div className="w-full h-full flex items-center justify-center rounded-lg bg-muted/20" />
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted/20" />
+          )}
+          {isTimeBlock && (
+            <div className="w-full text-[9px] text-center text-white/70 leading-tight px-1 line-clamp-2">
+              {typeof data.runAt === "string" && data.runAt
+                ? "Scheduled"
+                : "Not scheduled"}
+            </div>
           )}
         </div>
       </SimpleCard>
