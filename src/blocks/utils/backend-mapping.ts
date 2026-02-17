@@ -117,8 +117,25 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
       return {};
 
     case "wallet-node":
-      return {};
+    // Lending (Aave, Compound)
+    case 'aave':
+    case 'compound':
+      return {
+        provider: node.data.lendingProvider,
+        chain: node.data.lendingChain,
+        operation: node.data.lendingOperation,
+        asset: {
+          address: node.data.assetAddress,
+          symbol: node.data.assetSymbol,
+          decimals: node.data.assetDecimals,
+        },
+        amount: node.data.lendingAmount,
+        walletAddress: node.data.walletAddress,
+        interestRateMode: node.data.interestRateMode, // Optional (Aave specific)
+        simulateFirst: node.data.simulateFirst ?? true,
+      };
 
+    // Oracles
     case "chainlink":
       return {
         provider: "CHAINLINK",
