@@ -13,7 +13,7 @@ export const chainlinkBlock: BlockDefinition = {
     description: "Decentralized oracle price feeds",
     category: "oracle",
     nodeType: "chainlink",
-    backendType: "PRICE_ORACLE",
+    backendType: "CHAINLINK_PRICE_ORACLE",
     sharedConfigComponent: "oracle",
     supportedChains: ["ARBITRUM", "ARBITRUM_SEPOLIA"],
     configComponentProps: {
