@@ -4,6 +4,7 @@ import React, { useCallback, useState, useMemo } from "react";
 import { LuLoader, LuSend, LuRefreshCw, LuCircleHelp, LuChevronDown, LuChevronUp } from "react-icons/lu";
 import { Button } from "@/components/ui/Button";
 import { Typography } from "@/components/ui/Typography";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { SlackNotificationBanner } from "./SlackNotificationBanner";
 import type { SlackChannel, SlackNotification, SlackLoadingState } from "@/types/slack";
 
@@ -66,6 +67,17 @@ export const SlackChannelSelector = React.memo(function SlackChannelSelector({
     );
 
     const isUpdatingChannel = pendingChannelUpdate !== null || loading.processing;
+
+    const channelOptions = useMemo(
+        () => [
+            { value: "", label: "Select a channel..." },
+            ...channels.map((c) => ({
+                value: c.id,
+                label: `#${c.name}${c.isPrivate ? " (Private)" : ""}`,
+            })),
+        ],
+        [channels]
+    );
 
     /**
      * Collapsible Help Tip Component
@@ -133,20 +145,14 @@ export const SlackChannelSelector = React.memo(function SlackChannelSelector({
 
     return (
         <div className="space-y-2">
-            <select
-                value={pendingChannelUpdate || selectedChannelId}
+            <Dropdown
+                options={channelOptions}
+                value={pendingChannelUpdate || selectedChannelId || ""}
                 onChange={handleChannelChange}
                 disabled={isUpdatingChannel}
-                className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                placeholder="Select a channel..."
                 aria-label="Select Slack channel"
-            >
-                <option value="">Select a channel...</option>
-                {channels.map((channel) => (
-                    <option key={channel.id} value={channel.id}>
-                        #{channel.name} {channel.isPrivate ? "(Private)" : ""}
-                    </option>
-                ))}
-            </select>
+            />
 
             {!selectedChannelId && !pendingChannelUpdate && (
                 <Typography variant="caption" className="text-warning text-xs">
