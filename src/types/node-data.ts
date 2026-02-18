@@ -79,8 +79,8 @@ export type StartNodeData = BaseNodeData;
 
 // AI Transform Node Data
 export interface AiTransformNodeData extends BaseNodeData {
-    llmProvider?: 'openai' | 'openrouter';
-    llmModel?: string;
+    provider?: 'openai' | 'openrouter';
+    model?: string;
     userPromptTemplate?: string;
     outputSchema?: Record<string, unknown>;
     temperature?: number;
@@ -253,6 +253,6 @@ export function isAiTransformNodeData(data: unknown): data is AiTransformNodeDat
     return (
         typeof data === "object" &&
         data !== null &&
-        ("llmProvider" in data || "llmModel" in data || "userPromptTemplate" in data)
+        ("provider" in data || "model" in data || "userPromptTemplate" in data)
     );
 }

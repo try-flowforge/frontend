@@ -100,11 +100,11 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
       };
 
     case "ai-transform": {
-      const aiConfig = getAiModelConfig(data.llmModel as string);
+      const aiConfig = getAiModelConfig(data.model as string);
 
       return {
-        provider: data.llmProvider,
-        model: data.llmModel,
+        provider: data.provider,
+        model: data.model,
         userPromptTemplate: data.userPromptTemplate,
         outputSchema: data.outputSchema,
         // Temperature and max tokens are enforced by internal config
