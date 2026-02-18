@@ -40,6 +40,34 @@ interface UserData {
     selected_chains?: string[];
 }
 
+const STORAGE_KEY = "onboarding_status";
+
+interface PersistedState {
+    skipped: boolean;
+    completedChains: Record<string, boolean>;
+}
+
+const getStoredState = (): PersistedState => {
+    if (typeof window === "undefined") return { skipped: false, completedChains: {} };
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) return JSON.parse(stored);
+    } catch (e) {
+        console.error("Failed to parse onboarding status", e);
+    }
+    return { skipped: false, completedChains: {} };
+};
+
+const setStoredState = (state: Partial<PersistedState>) => {
+    if (typeof window === "undefined") return;
+    try {
+        const current = getStoredState();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...state }));
+    } catch (e) {
+        console.error("Failed to save onboarding status", e);
+    }
+};
+
 interface OnboardingContextType {
     // State
     needsOnboarding: boolean;
@@ -120,7 +148,11 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
     const [chainsToSetup, setChainsToSetup] = useState<ChainConfig[]>([]);
 
     const [isCheckingUser, setIsCheckingUser] = useState(false);
-    const [needsOnboarding, setNeedsOnboarding] = useState(false);
+    const [needsOnboarding, setNeedsOnboarding] = useState(() => {
+        const persisted = getStoredState();
+        const hasAnyCompleted = Object.values(persisted.completedChains).some(v => v);
+        return !persisted.skipped && !hasAnyCompleted;
+    });
     const [isOnboarding, setIsOnboarding] = useState(false);
     const [progress, setProgress] = useState<Record<string, ChainProgress>>({});
     const [currentSigningChain, setCurrentSigningChain] = useState<string | null>(null);
@@ -270,7 +302,13 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
         let cancelled = false;
 
         (async () => {
-            setIsCheckingUser(true);
+            const persisted = getStoredState();
+            const initiallySkippedOrCompleted = persisted.skipped || Object.values(persisted.completedChains).some(v => v);
+
+            // Only show the "checking" spinner if we don't already have a reason to hide it
+            if (!initiallySkippedOrCompleted) {
+                setIsCheckingUser(true);
+            }
             try {
                 const user = await fetchUserData();
                 if (cancelled) return;
@@ -294,7 +332,35 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 }
 
                 // Phase 3: Detailed Onboarding Necessity Check
-                if (!user) {
+                const persisted = getStoredState();
+                const isSkipped = persisted.skipped;
+                let hasAnyCompleted = Object.values(persisted.completedChains).some(v => v);
+
+                // Sync backend state to local storage
+                if (user?.safe_wallets && Object.keys(user.safe_wallets).length > 0) {
+                    const newCompleted = { ...persisted.completedChains };
+                    let changed = false;
+
+                    // Map numeric chain IDs from backend to our storage keys (chain.id)
+                    const chainsToValidate = chainsToSetup.length > 0 ? chainsToSetup : (await validateAndGetOnboardingChains().catch(() => ({ chains: [] }))).chains;
+
+                    for (const chain of chainsToValidate) {
+                        const numericId = String(getChain(chain.chainId)?.chainId || chain.chainId);
+                        if (user.safe_wallets[numericId] && !newCompleted[chain.id]) {
+                            newCompleted[chain.id] = true;
+                            changed = true;
+                        }
+                    }
+
+                    if (changed) {
+                        setStoredState({ completedChains: newCompleted });
+                        hasAnyCompleted = true;
+                    }
+                }
+
+                if (isSkipped || hasAnyCompleted) {
+                    setNeedsOnboarding(false);
+                } else if (!user) {
                     // Brand new user needs wallet choice & full setup
                     setNeedsOnboarding(true);
                 } else {
@@ -535,6 +601,11 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                         [chainKey]: { ...prev[chainKey], moduleVerify: "success" },
                     }));
 
+                    // Persist completion for this chain
+                    const persisted = getStoredState();
+                    const updatedChains = { ...persisted.completedChains, [chainKey]: true };
+                    setStoredState({ completedChains: updatedChains });
+
                     return true;
                 } catch (verifyError) {
                     setProgress((prev) => ({
@@ -643,6 +714,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
         setNeedsOnboarding(false);
         setIsOnboarding(false);
         setIsMinimized(false);
+        // Persist skip status
+        setStoredState({ skipped: true });
     }, []);
 
     const toggleMinimize = useCallback(() => {

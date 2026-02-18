@@ -144,6 +144,254 @@ export interface ExecuteWorkflowResponseData {
 export type ApiError = ApiClientError;
 
 /**
+ * Validation error details from the backend WorkflowValidator (graph-level)
+ */
+export interface ValidationErrorDetails {
+  reason?: string;
+  field?: string;
+  nodeId?: string;
+  nodeIds?: string[];
+  referencedNodeId?: string;
+}
+
+/**
+ * Joi schema validation error (block-config-level)
+ */
+export interface JoiFieldError {
+  field: string;
+  message: string;
+}
+
+/**
+ * Result of workflow validation
+ */
+export interface ValidateWorkflowResult {
+  valid: boolean;
+  message: string;
+  /** Present when validation fails */
+  errorCode?: string;
+  /** Joi field-level errors (when blocks have missing configs) */
+  fieldErrors?: JoiFieldError[];
+  /** Graph-level error details from WorkflowValidator */
+  graphDetails?: ValidationErrorDetails;
+}
+
+/**
+ * Convert a raw camelCase config field name to a human-readable label.
+ * Strips common block-type prefixes (swap, lending, etc.) and formats nicely.
+ *   "swapProvider"       → "Provider"
+ *   "userPromptTemplate" → "Prompt Template"
+ *   "tokenIn"            → "Token In"
+ *   "apiKey"             → "API Key"
+ */
+/**
+ * Convert a raw camelCase or dot-separated config field path to a human-readable label.
+ * Strips common prefixes and formats nicely.
+ *   "swapProvider"                   → "Provider"
+ *   "inputConfig.sourceToken.address" → "Source Token Address"
+ *   "asset.symbol"                   → "Asset Symbol"
+ */
+function humanizeFieldName(raw: string): string {
+  // 1. Strip structural prefixes from new nested schemas
+  let clean = raw
+    .replace(/^inputConfig\./, "")
+    .replace(/^asset\./, "")
+    .replace(/^sourceToken\./, "Source Token ")
+    .replace(/^destinationToken\./, "Destination Token ");
+
+  // Known exact mappings for common final field names
+  const knownLabels: Record<string, string> = {
+    swapProvider: "Provider",
+    swapChain: "Chain",
+    swapType: "Swap Type",
+    tokenIn: "Token In",
+    tokenOut: "Token Out",
+    amount: "Amount",
+    slippage: "Slippage",
+    apiKey: "API Key",
+    model: "Model",
+    userPromptTemplate: "Prompt Template",
+    systemPrompt: "System Prompt",
+    to: "Recipient",
+    subject: "Subject",
+    body: "Body",
+    message: "Message",
+    connectionId: "Connection",
+    chatId: "Chat ID",
+    provider: "Provider",
+    chain: "Chain",
+    action: "Action",
+    token: "Token",
+    feedId: "Price Feed",
+    description: "Description",
+    walletAddress: "Wallet Address",
+    triggerType: "Trigger Type",
+    schedule: "Schedule",
+    aggregatorAddress: "Aggregator Address",
+    priceFeedId: "Price Feed ID",
+    staleAfterSeconds: "Stale After (Seconds)",
+    maxOutputTokens: "Max Tokens",
+    webhookPath: "Webhook Path",
+    cronExpression: "Cron Expression",
+  };
+
+  if (knownLabels[clean]) return knownLabels[clean];
+
+  // 2. Format remaining camelCase or dot identifiers
+  // Strip common block-type prefixes (swap, lending, etc.) if still present
+  clean = clean.replace(/^(swap|lending|oracle|telegram|mail|ai)/, "");
+
+  // Replace dots with spaces
+  clean = clean.replace(/\./g, " ");
+
+  // Insert space before capitals
+  clean = clean.replace(/([A-Z])/g, " $1");
+
+  // Trim and capitalize first letter
+  const result = clean.trim();
+  return result.charAt(0).toUpperCase() + result.slice(1);
+}
+
+/**
+ * Build a user-friendly summary from Joi field errors.
+ * Uses the original React Flow nodes to identify blocks by their display name.
+ *
+ * Example output:
+ *   "Swap → missing Provider, Chain, Type\nMail → missing Recipient, Subject"
+ */
+function summarizeJoiErrors(fieldErrors: JoiFieldError[], nodes: Node[]): string {
+  // Joi path.join('.') produces: "nodes.0.config.provider", "nodes.2.config.apiKey"
+  // Joi messages use bracket notation: "nodes[0].config.provider"
+  // We match BOTH formats to be safe
+  const dotRegex = /^nodes\.(\d+)\.config\.(.+)$/;
+  const bracketRegex = /^nodes\[(\d+)\]\.config\.(.+)$/;
+  const nodeErrorMap = new Map<string, string[]>(); // nodeIndex → readable field names
+  const otherErrors: string[] = [];
+
+  for (const err of fieldErrors) {
+    const match = err.field.match(dotRegex) || err.field.match(bracketRegex);
+    if (match) {
+      const nodeIndex = match[1];
+      const fieldName = match[2];
+      if (!nodeErrorMap.has(nodeIndex)) {
+        nodeErrorMap.set(nodeIndex, []);
+      }
+      nodeErrorMap.get(nodeIndex)!.push(humanizeFieldName(fieldName));
+    } else {
+      // Non-node config errors (top-level like "name", "description")
+      otherErrors.push(err.message);
+    }
+  }
+
+  if (nodeErrorMap.size === 0 && otherErrors.length > 0) {
+    return otherErrors.slice(0, 3).join(". ");
+  }
+
+  if (nodeErrorMap.size === 0) {
+    return "Some fields are missing. Please review your blocks.";
+  }
+
+  // Build per-block line summaries
+  const lines: string[] = [];
+  for (const [indexStr, fields] of nodeErrorMap) {
+    const idx = parseInt(indexStr, 10);
+    // Look up the block's display name from the original nodes
+    const node = nodes[idx];
+    const blockName = node?.data?.label || node?.type || `Block ${idx + 1}`;
+
+    const fieldList = fields.slice(0, 4).join(", ");
+    const extra = fields.length > 4 ? ` +${fields.length - 4} more` : "";
+    lines.push(`${blockName} → missing ${fieldList}${extra}`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Validate a workflow without saving it
+ * Calls the backend POST /workflows/validate endpoint which runs:
+ * 1. Joi schema validation (block config fields: provider, apiKey, etc.)
+ * 2. WorkflowValidator checks (trigger integrity, graph cycles, orphaned nodes, template refs)
+ */
+export async function validateWorkflow(params: {
+  accessToken: string;
+  nodes: Node[];
+  edges: Edge[];
+}): Promise<ValidateWorkflowResult> {
+  // Find trigger node (start node)
+  const startNode = params.nodes.find(
+    (n) => n.type === "start" || n.id === "start-node",
+  );
+
+  const response = await api.post<{
+    data: { valid: boolean; message: string };
+  }>(
+    "/workflows/validate",
+    {
+      name: "Validation Check",
+      nodes: params.nodes.map(transformNodeToBackend),
+      edges: params.edges.map(transformEdgeToBackend),
+      triggerNodeId: startNode?.id,
+    },
+    { accessToken: params.accessToken },
+  );
+
+  if (!response.ok) {
+    const err = response.error;
+    const errCode = err?.code;
+
+    // ── Case 1: Joi schema validation errors (block config fields) ──
+    // code = "VALIDATION_ERROR", details = Array<{field, message}>
+    if (errCode === "VALIDATION_ERROR" && Array.isArray(err?.details)) {
+      const fieldErrors = err.details as JoiFieldError[];
+      const friendlyMessage = summarizeJoiErrors(fieldErrors, params.nodes);
+
+      return {
+        valid: false,
+        message: friendlyMessage,
+        errorCode: "VALIDATION_ERROR",
+        fieldErrors,
+      };
+    }
+
+
+    // ── Case 2: WorkflowValidator graph-structure errors ──
+    // code = "VALIDATION_FAILED", details = {reason, nodeId, ...}
+    // Note: details comes through as an object (not an array) from the error handler
+    const rawDetails = (err as any)?.details;
+    const reason = rawDetails?.reason as string | undefined;
+
+    let friendlyMessage = err?.message || "Workflow validation failed";
+
+    if (reason === "MISSING_TRIGGER") {
+      friendlyMessage = "Your workflow needs a Start (trigger) block. Please add one to begin.";
+    } else if (reason === "MULTIPLE_TRIGGERS") {
+      friendlyMessage = "Your workflow has multiple Start blocks. Only one is allowed.";
+    } else if (reason === "CIRCULAR_DEPENDENCY") {
+      friendlyMessage = "Circular connection detected — a block is connecting back to itself. Please remove the loop.";
+    } else if (reason === "ORPHANED_NODES") {
+      const count = rawDetails?.nodeIds?.length || 0;
+      friendlyMessage = `${count} block${count > 1 ? "s are" : " is"} not connected to the workflow. Connect or remove ${count > 1 ? "them" : "it"} to continue.`;
+    } else if (reason === "INVALID_FORWARD_REFERENCE") {
+      friendlyMessage = "A block references another block that isn't upstream. Check your template variables.";
+    }
+
+    return {
+      valid: false,
+      message: friendlyMessage,
+      errorCode: errCode || "VALIDATION_FAILED",
+      graphDetails: rawDetails as ValidationErrorDetails | undefined,
+    };
+  }
+
+  return {
+    valid: true,
+    message: "Workflow is valid",
+  };
+}
+
+
+/**
  * Execute a workflow
  */
 export async function executeWorkflow(params: {
@@ -172,11 +420,10 @@ export async function executeWorkflow(params: {
     // Handle rate limiting (429)
     if (response.status === 429) {
       error.code = "RATE_LIMIT_EXCEEDED";
-      error.message = `Rate limit exceeded. Please try again ${
-        error.retryAfter
-          ? `in ${Math.ceil(error.retryAfter / 1000)} seconds`
-          : "later"
-      }.`;
+      error.message = `Rate limit exceeded. Please try again ${error.retryAfter
+        ? `in ${Math.ceil(error.retryAfter / 1000)} seconds`
+        : "later"
+        }.`;
     }
 
     // Handle validation errors (400)
