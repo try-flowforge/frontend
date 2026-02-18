@@ -33,7 +33,7 @@ const AI_MODEL_CONFIG_BY_MODEL: Record<string, AiModelConfig> = {
     displayName: "Qwen",
     model: "qwen/qwen3-coder:free",
     temperature: 0.7,
-    maxOutputTokens: 262000,
+    maxOutputTokens: 4096,
   },
 
   // GLM
@@ -53,7 +53,7 @@ const AI_MODEL_CONFIG_BY_MODEL: Record<string, AiModelConfig> = {
     displayName: "DeepSeek",
     model: "deepseek/deepseek-r1-0528:free",
     temperature: 0.7,
-    maxOutputTokens: 163840,
+    maxOutputTokens: 4096,
   },
 
   // ChatGPT
