@@ -48,6 +48,13 @@ export default function NavBar() {
 
       {/* Right Side - Navigation & Button */}
       <div className="flex items-center gap-4 sm:gap-6">
+        {/* Agent Onboarding */}
+        <Link href="/agent-onboarding" className="hidden sm:block">
+          <Button border borderColor="#fb923c">
+            Agent
+          </Button>
+        </Link>
+
         {/* Start Creating Button */}
         <Link href="/automation-builder" className="hidden sm:block">
           <Button>

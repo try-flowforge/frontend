@@ -12,17 +12,14 @@
 
 import { Typography } from "@/components/ui/Typography";
 import { SimpleCard } from "@/components/ui/SimpleCard";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy } from "@privy-io/react-auth";
 import { LuLock } from "react-icons/lu";
 
 export function AuthenticationStatus() {
-  const { wallets } = useWallets();
   const { authenticated } = usePrivy();
-  const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
-  const isConnected = authenticated && embeddedWallet !== undefined;
 
   // Don't show component if user is already authenticated
-  if (isConnected) {
+  if (authenticated) {
     return null;
   }
 

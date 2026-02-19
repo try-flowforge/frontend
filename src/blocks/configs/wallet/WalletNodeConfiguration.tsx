@@ -27,7 +27,6 @@ function WalletNodeConfigurationInner() {
   const primaryWallet =
     linkedWallets.find((wallet) => wallet.walletClientType !== "privy") ||
     linkedWallets.find((wallet) => wallet.walletClientType === "privy");
-  const isConnected = authenticated && primaryWallet !== undefined;
   const address = primaryWallet?.address;
 
   const { selection, creation } = useSafeWalletContext();
@@ -176,7 +175,7 @@ function WalletNodeConfigurationInner() {
     await startOnboarding();
   }, [chainsToSetup.length, hasUnsavedChainSelection, startOnboarding]);
 
-  if (!isConnected) {
+  if (!authenticated) {
     return <AuthenticationStatus />;
   }
 
