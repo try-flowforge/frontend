@@ -21,6 +21,7 @@ import {
     LuCircleArrowDown,
 } from "react-icons/lu";
 import { useWallets } from "@privy-io/react-auth";
+import { ethers } from "ethers";
 import { useSafeWalletContext } from "@/context/SafeWalletContext";
 import {
     LendingProvider,
@@ -207,7 +208,7 @@ function LendingNodeConfigurationInner({
 
         try {
             // Convert amount to wei/smallest unit based on token decimals
-            const amountInWei = (parseFloat(lendingAmount) * Math.pow(10, assetDecimals)).toString();
+            const amountInWei = ethers.parseUnits(lendingAmount || "0", assetDecimals).toString();
 
             const lendingConfig: LendingInputConfig = {
                 operation: lendingOperation,

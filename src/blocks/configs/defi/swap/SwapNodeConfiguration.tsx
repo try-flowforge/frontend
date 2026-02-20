@@ -536,7 +536,7 @@ export function SwapNodeConfiguration({
                 }
 
                 // Convert amount to wei/smallest unit based on token decimals
-                const amountInWei = BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, sourceTokenDecimals)));
+                const amountInWei = ethers.parseUnits(swapAmount || "0", sourceTokenDecimals);
 
                 const swapConfig = {
                     sourceToken: {
@@ -704,7 +704,7 @@ export function SwapNodeConfiguration({
                     : getContractAddress(swapChain, "uniswapRouter") ?? "";
 
             // Convert amount to wei/smallest unit based on token decimals
-            const amountInWei = BigInt(Math.floor(parseFloat(swapAmount) * Math.pow(10, sourceTokenDecimals)));
+            const amountInWei = ethers.parseUnits(swapAmount || "0", sourceTokenDecimals);
 
             // Step 0: Check token balance first
             //console.log("Step 0: Checking token balance...");

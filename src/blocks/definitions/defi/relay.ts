@@ -15,6 +15,7 @@ export const relayBlock: BlockDefinition = {
     iconName: "RelayLogo",
     description: "Cross-chain swaps via Relay",
     category: "defi",
+    hidden: true,
     nodeType: "relay",
     backendType: "SWAP",
     sharedConfigComponent: "swap",

@@ -37,13 +37,16 @@ const createAiTransformBlock = (
 };
 
 // Individual AI Transform blocks
-export const aiTransformQwen: BlockDefinition = createAiTransformBlock(
-  "ai-openrouter-qwen-free",
-  "Qwen",
-  "openrouter",
-  "openrouter:qwen",
-  "QwenLogo"
-);
+export const aiTransformQwen: BlockDefinition = {
+  ...createAiTransformBlock(
+    "ai-openrouter-qwen-free",
+    "Qwen",
+    "openrouter",
+    "openrouter:qwen",
+    "QwenLogo"
+  ),
+  hidden: true,
+};
 
 export const aiTransformGLM: BlockDefinition = createAiTransformBlock(
   "ai-openrouter-glm-free",

@@ -15,6 +15,7 @@ export const oneInchBlock: BlockDefinition = {
     iconName: "OneInchLogo",
     description: "Swap tokens via 1inch aggregator",
     category: "defi",
+    hidden: true,
     nodeType: "oneinch",
     backendType: "SWAP",
     sharedConfigComponent: "swap",

@@ -1,5 +1,7 @@
 "use client";
 
+import { TransactionSigningModal } from "@/components/workspace/TransactionSigningModal";
+
 import React, {
   createContext,
   useContext,
@@ -28,6 +30,7 @@ import { useUnsavedChanges } from "@/hooks/useWorkflowState";
 import { calculateCanvasCenter } from "@/utils/canvas";
 import { saveWorkflow, saveAndExecuteWorkflow, getWorkflow, transformWorkflowToCanvas, validateWorkflow } from "../utils/workflow-api";
 import { useToast } from "@/context/ToastContext";
+import { buildApiUrl } from "@/config/api";
 import { LuSquareCheck, LuClock } from "react-icons/lu";
 
 // The Start node ID - used to identify and protect it from deletion
@@ -195,6 +198,15 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Transaction signing modal state (for SSE-triggered signing)
+  const [signingModalData, setSigningModalData] = useState<{
+    executionId: string;
+    safeTxHash: string;
+    safeTxData: { to: string; value: string; data: string; operation: number };
+    nodeId: string;
+    nodeType: string;
+  } | null>(null);
 
   // Undo / Redo history (snapshots of { nodes, edges })
   const undoStackRef = useRef<Array<{ nodes: Node[]; edges: Edge[] }>>([]);
@@ -434,6 +446,45 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
 
         if (result.success) {
           toast.success("Workflow Running", `Execution started. ID: ${result.executionId?.slice(0, 8)}...`);
+
+          // Subscribe to SSE for real-time signing requests
+          const executionId = result.executionId;
+          const subscriptionToken = result.data?.subscriptionToken;
+          if (executionId && subscriptionToken) {
+            const sseUrl = `${buildApiUrl('/workflows/executions')}/${executionId}/subscribe?token=${encodeURIComponent(subscriptionToken)}`;
+            const eventSource = new EventSource(sseUrl);
+
+            eventSource.addEventListener('node:signature_required', (ev) => {
+              try {
+                const data = JSON.parse(ev.data);
+                setSigningModalData({
+                  executionId: data.executionId,
+                  safeTxHash: data.safeTxHash,
+                  safeTxData: data.safeTxData,
+                  nodeId: data.nodeId || '',
+                  nodeType: data.nodeType || '',
+                });
+              } catch (e) {
+                console.error('Failed to parse signature_required event', e);
+              }
+            });
+
+            eventSource.addEventListener('execution:completed', () => {
+              eventSource.close();
+            });
+
+            eventSource.addEventListener('execution:failed', () => {
+              eventSource.close();
+            });
+
+            eventSource.addEventListener('close', () => {
+              eventSource.close();
+            });
+
+            eventSource.onerror = () => {
+              eventSource.close();
+            };
+          }
         } else {
           toast.error("Execution Failed", result.error?.message || "An unknown error occurred.");
         }
@@ -1198,6 +1249,17 @@ const WorkflowProviderInner: React.FC<{ children: React.ReactNode }> = ({
           nodes={nodes}
           currentVersion={workflowVersion}
           currentWorkflowId={currentWorkflowId}
+        />
+      )}
+      {signingModalData && (
+        <TransactionSigningModal
+          isOpen={!!signingModalData}
+          onClose={() => setSigningModalData(null)}
+          executionId={signingModalData.executionId}
+          safeTxHash={signingModalData.safeTxHash}
+          safeTxData={signingModalData.safeTxData}
+          nodeId={signingModalData.nodeId}
+          nodeType={signingModalData.nodeType}
         />
       )}
     </WorkflowContext.Provider>
