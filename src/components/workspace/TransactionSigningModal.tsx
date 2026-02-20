@@ -69,7 +69,7 @@ export function TransactionSigningModal({
             }
 
             const res = await fetch(
-                `${buildApiUrl("/api/v1/executions")}/${executionId}/sign`,
+                `${buildApiUrl("/executions")}/${executionId}/sign`,
                 {
                     method: "POST",
                     headers: {

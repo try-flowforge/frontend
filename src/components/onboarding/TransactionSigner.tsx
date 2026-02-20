@@ -52,7 +52,7 @@ export function TransactionSigner({ intentId }: { intentId: string }) {
             const headers: Record<string, string> = { 'content-type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const response = await fetch(`${buildApiUrl('/api/v1/intents')}/${intentId}`, { headers });
+            const response = await fetch(`${buildApiUrl('/intents')}/${intentId}`, { headers });
             let data: any = null;
             try { data = await response.json(); } catch (_) { /* not json */ }
 
@@ -103,7 +103,7 @@ export function TransactionSigner({ intentId }: { intentId: string }) {
 
             // Submit signature to backend — relayer broadcasts the tx
             const token = await getPrivyAccessToken();
-            const completeRes = await fetch(`${buildApiUrl('/api/v1/intents')}/${intent.id}/complete`, {
+            const completeRes = await fetch(`${buildApiUrl('/intents')}/${intent.id}/complete`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ signature }),
