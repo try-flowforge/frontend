@@ -127,7 +127,7 @@ export function UserMenu() {
 
       {/* Popover Menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-black/95 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-black/95 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl z-50 overflow-hidden">
           {/* Header Section */}
           <div className="p-6 border-b border-white/20">
             <div className="flex flex-col items-center text-center space-y-4">

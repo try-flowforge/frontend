@@ -12,6 +12,9 @@ import {
     FaProjectDiagram,
     FaCodeBranch
 } from "react-icons/fa";
+import { BiRocket } from "react-icons/bi";
+import { Button } from "../ui/Button";
+import Link from "next/link";
 
 interface HeroSectionProps {
     gapAnimation?: MotionValue<string>;
@@ -29,7 +32,7 @@ const ROTATING_SYMBOLS = ["%", "$", "#", "@", "&"];
 
 export function HeroSection({ gapAnimation }: HeroSectionProps) {
     return (
-        <section className="relative h-screen w-full flex items-center justify-center overflow-hidden bg-black">
+        <section className="relative h-screen w-full flex flex-col gap-5 items-center justify-center overflow-hidden bg-black">
             {/* --- BACKGROUND LAYER 1: Gradient, Dot Grid --- */}
             <div className="absolute inset-0 bg-linear-to-b from-black/30 via-[#0B192C]/40 to-black/30" />
             <div
@@ -74,7 +77,7 @@ export function HeroSection({ gapAnimation }: HeroSectionProps) {
                     className="flex items-center justify-center"
                 >
                     <Typography variant="h1">
-                        <MdCropSquare className="w-7 h-7 mb-8 inline" /> WEB2{" "}
+                        <MdCropSquare className="w-4 h-4 md:w-7 md:h-7 mb-4 md:mb-8 inline" /> WEB2{" "}
                         <span className="mx-3">
                             <RotatingElement
                                 items={ROTATING_SYMBOLS.map((symbol) => ({ text: symbol }))}
@@ -87,6 +90,23 @@ export function HeroSection({ gapAnimation }: HeroSectionProps) {
                     </Typography>
                 </motion.div>
             </motion.div>
+
+            <div className=" items-center gap-4 hidden">
+                {/* Agent Onboarding */}
+                <Link href="/agent-onboarding">
+                    <Button border borderColor="#fb923c" className="w-[150px]">
+                        Agent
+                    </Button>
+                </Link>
+
+                {/* Start Creating Button */}
+                <Link href="/automation-builder">
+                    <Button className="w-[150px]">
+                        <BiRocket className="w-4 h-4" />
+                        Start Creating
+                    </Button>
+                </Link>
+            </div>
         </section>
     );
 }
