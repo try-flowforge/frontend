@@ -15,10 +15,15 @@ import { SimpleCard } from "@/components/ui/SimpleCard";
 import { Button } from "@/components/ui/Button";
 import { WalletNodeConfiguration } from "@/blocks/configs/wallet/WalletNodeConfiguration";
 import { TelegramNodeConfiguration } from "@/blocks/configs/social/telegram/TelegramNodeConfiguration";
+import { useSearchParams } from "next/navigation";
+import { TransactionSigner } from "./TransactionSigner";
 
 type OnboardingStep = 1 | 2;
 
 export default function AgentOnboardingPageClient() {
+  const searchParams = useSearchParams();
+  const intentId = searchParams.get("intentId");
+
   const { ready, authenticated, login } = usePrivy();
   const { wallets } = useWallets();
 
@@ -66,6 +71,20 @@ export default function AgentOnboardingPageClient() {
   );
 
   const activeStep = steps.find((s) => s.id === step) ?? steps[0];
+
+  // If there's an intentId in the URL, act as the magic-link destination
+  if (intentId) {
+    return (
+      <div className="space-y-6 max-w-xl mx-auto">
+        <div className="p-6 sm:p-7">
+          <Typography variant="h1" className="text-foreground" align="center">
+            Blockchain Agent Action
+          </Typography>
+        </div>
+        <TransactionSigner intentId={intentId} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -194,80 +213,80 @@ export default function AgentOnboardingPageClient() {
               </div>
             </div>
 
-              {step === 1 ? (
-                !isSignedIn ? (
-                  <SimpleCard className="p-6 rounded-2xl border-white/10">
-                    <div className="flex items-start gap-4">
-                      <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10">
-                        <LuWallet className="h-5 w-5 text-foreground" aria-hidden />
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <Typography variant="bodySmall" className="font-semibold text-foreground">
-                          Sign in to begin
-                        </Typography>
-                        <Typography variant="caption" className="text-muted-foreground">
-                          Sign in to create your account or continue your Safe onboarding and wallet setup.
-                        </Typography>
-                        <div className="pt-2">
-                          <Button
-                            disabled={!ready}
-                            onClick={() => login({ loginMethods: ["email"] })}
-                          >
-                            <BiLogInCircle className="w-4 h-4" />
-                            <span>Sign In</span>
-                          </Button>
-                        </div>
+            {step === 1 ? (
+              !isSignedIn ? (
+                <SimpleCard className="p-6 rounded-2xl border-white/10">
+                  <div className="flex items-start gap-4">
+                    <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                      <LuWallet className="h-5 w-5 text-foreground" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <Typography variant="bodySmall" className="font-semibold text-foreground">
+                        Sign in to begin
+                      </Typography>
+                      <Typography variant="caption" className="text-muted-foreground">
+                        Sign in to create your account or continue your Safe onboarding and wallet setup.
+                      </Typography>
+                      <div className="pt-2">
+                        <Button
+                          disabled={!ready}
+                          onClick={() => login({ loginMethods: ["email"] })}
+                        >
+                          <BiLogInCircle className="w-4 h-4" />
+                          <span>Sign In</span>
+                        </Button>
                       </div>
                     </div>
-                  </SimpleCard>
-                ) : (
-                  <div className="space-y-4">
-                    <WalletNodeConfiguration />
-                  </div>
-                )
-              ) : !isSignedIn ? (
-                <SimpleCard className="p-6 rounded-2xl border-white/10">
-                  <Typography variant="caption" className="text-muted-foreground mt-1 block">
-                    Sign in to continue. Telegram linking uses your authenticated session.
-                  </Typography>
-                  <div className="pt-3">
-                    <Button
-                      disabled={!ready}
-                      onClick={() => {
-                        setStep(1);
-                        login({ loginMethods: ["email"] });
-                      }}
-                    >
-                      <BiLogInCircle className="w-4 h-4" />
-                      <span>Sign In</span>
-                    </Button>
-                  </div>
-                </SimpleCard>
-              ) : !hasLinkedWallet ? (
-                <SimpleCard className="p-6 rounded-2xl border-white/10">
-                  <Typography variant="bodySmall" className="font-semibold text-foreground">
-                    Wallet connection required
-                  </Typography>
-                  <Typography variant="caption" className="text-muted-foreground mt-1 block">
-                    Connect your wallet in Step 1 before linking Telegram.
-                  </Typography>
-                  <div className="pt-3">
-                    <Button onClick={() => setStep(1)}>
-                      Go to Step 1
-                      <LuChevronRight className="h-4 w-4" />
-                    </Button>
                   </div>
                 </SimpleCard>
               ) : (
-                <TelegramNodeConfiguration
-                  nodeData={telegramNodeData}
-                  handleDataChange={(updates) =>
-                    setTelegramNodeData((prev) => ({ ...prev, ...updates }))
-                  }
-                  authenticated={authenticated}
-                  login={() => login({ loginMethods: ["email"] })}
-                />
-              )}
+                <div className="space-y-4">
+                  <WalletNodeConfiguration />
+                </div>
+              )
+            ) : !isSignedIn ? (
+              <SimpleCard className="p-6 rounded-2xl border-white/10">
+                <Typography variant="caption" className="text-muted-foreground mt-1 block">
+                  Sign in to continue. Telegram linking uses your authenticated session.
+                </Typography>
+                <div className="pt-3">
+                  <Button
+                    disabled={!ready}
+                    onClick={() => {
+                      setStep(1);
+                      login({ loginMethods: ["email"] });
+                    }}
+                  >
+                    <BiLogInCircle className="w-4 h-4" />
+                    <span>Sign In</span>
+                  </Button>
+                </div>
+              </SimpleCard>
+            ) : !hasLinkedWallet ? (
+              <SimpleCard className="p-6 rounded-2xl border-white/10">
+                <Typography variant="bodySmall" className="font-semibold text-foreground">
+                  Wallet connection required
+                </Typography>
+                <Typography variant="caption" className="text-muted-foreground mt-1 block">
+                  Connect your wallet in Step 1 before linking Telegram.
+                </Typography>
+                <div className="pt-3">
+                  <Button onClick={() => setStep(1)}>
+                    Go to Step 1
+                    <LuChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </SimpleCard>
+            ) : (
+              <TelegramNodeConfiguration
+                nodeData={telegramNodeData}
+                handleDataChange={(updates) =>
+                  setTelegramNodeData((prev) => ({ ...prev, ...updates }))
+                }
+                authenticated={authenticated}
+                login={() => login({ loginMethods: ["email"] })}
+              />
+            )}
           </div>
         </div>
       </div>
