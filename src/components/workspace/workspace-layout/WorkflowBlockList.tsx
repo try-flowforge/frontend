@@ -23,8 +23,17 @@ function categorizeDefiBlocks(blocks: BlockDefinition[]) {
   const lendingBlocks = blocks.filter(
     (block) => block.nodeType === "aave" || block.nodeType === "compound"
   );
+  const perpsBlocks = blocks.filter(
+    (block) => block.nodeType === "ostium"
+  );
+  const knownNodeTypes = new Set([
+    ...swapBlocks.map((b) => b.nodeType),
+    ...lendingBlocks.map((b) => b.nodeType),
+    ...perpsBlocks.map((b) => b.nodeType),
+  ]);
+  const otherBlocks = blocks.filter((block) => !knownNodeTypes.has(block.nodeType));
 
-  return { swapBlocks, lendingBlocks };
+  return { swapBlocks, lendingBlocks, perpsBlocks, otherBlocks };
 }
 
 export function WorkflowBlockList({
@@ -71,7 +80,7 @@ export function WorkflowBlockList({
 
             // Special handling for DeFi category - split into Swap and Lending
             if (category.id === "defi") {
-              const { swapBlocks, lendingBlocks } = categorizeDefiBlocks(categoryBlocks);
+              const { swapBlocks, lendingBlocks, perpsBlocks, otherBlocks } = categorizeDefiBlocks(categoryBlocks);
 
               return (
                 <div key={category.id} className="space-y-6">
@@ -116,6 +125,62 @@ export function WorkflowBlockList({
                       </div>
                       <div className="grid grid-cols-2 gap-2.5">
                         {lendingBlocks.map((block) => {
+                          const disabled = isBlockDisabled(block.id);
+                          return (
+                            <DraggableBlock
+                              key={block.id}
+                              block={block}
+                              onDragStart={handleBlockDragStart}
+                              onClick={handleBlockClick}
+                              disabled={disabled}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Perpetuals Section */}
+                  {perpsBlocks.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="px-1">
+                        <Typography
+                          variant="caption"
+                          className="text-xs font-semibold text-white/70 uppercase tracking-wider"
+                        >
+                          Perpetuals
+                        </Typography>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {perpsBlocks.map((block) => {
+                          const disabled = isBlockDisabled(block.id);
+                          return (
+                            <DraggableBlock
+                              key={block.id}
+                              block={block}
+                              onDragStart={handleBlockDragStart}
+                              onClick={handleBlockClick}
+                              disabled={disabled}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fallback for additional DeFi blocks */}
+                  {otherBlocks.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="px-1">
+                        <Typography
+                          variant="caption"
+                          className="text-xs font-semibold text-white/70 uppercase tracking-wider"
+                        >
+                          Other
+                        </Typography>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {otherBlocks.map((block) => {
                           const disabled = isBlockDisabled(block.id);
                           return (
                             <DraggableBlock

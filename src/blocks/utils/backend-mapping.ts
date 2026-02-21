@@ -5,8 +5,29 @@
 
 import type { Node } from "reactflow";
 import type { BackendNode } from "../types";
-import { getBlockByNodeType, normalizeNodeType as normalizeNodeTypeFromRegistry } from "../registry";
+import {
+  getBlockById,
+  getBlockByNodeType,
+  normalizeNodeType as normalizeNodeTypeFromRegistry,
+} from "../registry";
 import { getAiModelConfig } from "@/config/ai";
+
+function toOptionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
 
 /**
  * Extract node-specific configuration from node data
@@ -158,6 +179,46 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
         ...(data.feedName && { feedName: data.feedName }),
       };
 
+    case "ostium": {
+      const config: Record<string, unknown> = {
+        provider: "OSTIUM",
+        network: data.network || "testnet",
+        action: data.action || "MARKETS",
+      };
+
+      const market = toOptionalString(data.market);
+      const base = toOptionalString(data.base);
+      const quote = toOptionalString(data.quote);
+      const address = toOptionalString(data.address);
+      const traderAddress = toOptionalString(data.traderAddress);
+      const side = toOptionalString(data.side);
+      const idempotencyKey = toOptionalString(data.idempotencyKey);
+
+      const collateral = toOptionalNumber(data.collateral);
+      const leverage = toOptionalNumber(data.leverage);
+      const pairId = toOptionalNumber(data.pairId);
+      const tradeIndex = toOptionalNumber(data.tradeIndex);
+      const slPrice = toOptionalNumber(data.slPrice);
+      const tpPrice = toOptionalNumber(data.tpPrice);
+
+      if (market) config.market = market;
+      if (base) config.base = base;
+      if (quote) config.quote = quote;
+      if (address) config.address = address;
+      if (traderAddress) config.traderAddress = traderAddress;
+      if (side) config.side = side;
+      if (idempotencyKey) config.idempotencyKey = idempotencyKey;
+
+      if (collateral !== undefined) config.collateral = collateral;
+      if (leverage !== undefined) config.leverage = leverage;
+      if (pairId !== undefined) config.pairId = Math.trunc(pairId);
+      if (tradeIndex !== undefined) config.tradeIndex = Math.trunc(tradeIndex);
+      if (slPrice !== undefined) config.slPrice = slPrice;
+      if (tpPrice !== undefined) config.tpPrice = tpPrice;
+
+      return config;
+    }
+
     default:
       // Fallback: extract common fields
       return {
@@ -173,8 +234,13 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
  * Uses block metadata if available, otherwise falls back to generic transformation
  */
 export function transformNodeToCanvas(backendNode: BackendNode): Node {
-  const frontendType = (backendNode.metadata?.frontendType as string) ||
-    (typeof backendNode.type === 'string' ? backendNode.type.toLowerCase() : 'base');
+  const blockIdFromMetadata = backendNode.metadata?.blockId as string | undefined;
+  const blockFromId = blockIdFromMetadata ? getBlockById(blockIdFromMetadata) : undefined;
+
+  const frontendType =
+    (backendNode.metadata?.frontendType as string) ||
+    blockFromId?.nodeType ||
+    (typeof backendNode.type === "string" ? backendNode.type.toLowerCase() : "base");
 
   // Handle nullable name from backend API
   const nodeName = backendNode.name ?? backendNode.id;

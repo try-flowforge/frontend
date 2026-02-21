@@ -15,6 +15,7 @@ import { aaveBlock } from "./definitions/defi/aave";
 import { compoundBlock } from "./definitions/defi/compound";
 import { lifiBlock } from "./definitions/defi/lifi";
 import { oneInchBlock } from "./definitions/defi/oneinch";
+import { ostiumBlock } from "./definitions/defi/ostium";
 import { relayBlock } from "./definitions/defi/relay";
 import { uniswapBlock } from "./definitions/defi/uniswap";
 import { chainlinkBlock } from "./definitions/oracle/chainlink";
@@ -142,6 +143,7 @@ const STATIC_BLOCKS: BlockDefinition[] = [
   relayBlock,
   oneInchBlock,
   lifiBlock,
+  ostiumBlock,
   aaveBlock,
   compoundBlock,
   // Oracle blocks
