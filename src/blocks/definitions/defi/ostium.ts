@@ -23,7 +23,7 @@ export const ostiumBlock: BlockDefinition = {
     status: "idle" as const,
     provider: "OSTIUM",
     network: "testnet",
-    action: "MARKETS",
+    action: "OPEN_POSITION",
     market: "",
     base: "",
     quote: "USD",

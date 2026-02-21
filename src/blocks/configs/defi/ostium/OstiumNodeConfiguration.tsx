@@ -8,6 +8,8 @@ import { Dropdown } from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
 import { SimpleCard } from "@/components/ui/SimpleCard";
 import { Typography } from "@/components/ui/Typography";
+import { AuthenticationStatus } from "@/components/workspace/AuthenticationStatus";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { API_CONFIG } from "@/config/api";
 import { FEATURE_FLAGS } from "@/config/feature-flags";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
@@ -23,9 +25,11 @@ import {
   type OstiumAction,
   type OstiumNetwork,
   type OstiumSetupOverview,
+  type ParsedOstiumPosition,
+  parsePosition,
 } from "@/types/ostium";
 import { getChain } from "@/web3/config/chain-registry";
-import { LuArrowUpRight, LuCircleAlert, LuCircleCheck, LuLoader, LuRefreshCw } from "react-icons/lu";
+import { LuArrowUpRight, LuCircleAlert, LuInfo, LuLoader, LuRefreshCw } from "react-icons/lu";
 
 interface OstiumNodeConfigurationProps {
   nodeData: Record<string, unknown>;
@@ -60,19 +64,16 @@ function toAction(value: unknown): OstiumAction {
 function getReadinessBadge(ok: boolean): {
   className: string;
   label: string;
-  icon: React.ReactNode;
 } {
   if (ok) {
     return {
       className: "text-green-300 bg-green-500/10 border-green-500/20",
       label: "Ready",
-      icon: <LuCircleCheck className="w-4 h-4" />,
     };
   }
   return {
     className: "text-amber-200 bg-amber-500/10 border-amber-500/20",
-    label: "Setup Needed",
-    icon: <LuCircleAlert className="w-4 h-4" />,
+    label: "Configure Action",
   };
 }
 
@@ -80,7 +81,6 @@ function OstiumNodeConfigurationInner({
   nodeData,
   handleDataChange,
   authenticated,
-  login,
 }: OstiumNodeConfigurationProps) {
   const { getPrivyAccessToken, chainId } = usePrivyWallet();
 
@@ -120,11 +120,23 @@ function OstiumNodeConfigurationInner({
     data: null,
   });
 
+  const [positionsState, setPositionsState] = useState<{
+    loading: boolean;
+    error: string | null;
+    positions: unknown[];
+  }>({
+    loading: false,
+    error: null,
+    positions: [],
+  });
+
   const handleDataChangeRef = useRef(handleDataChange);
   const marketsInFlightRef = useRef(false);
   const overviewInFlightRef = useRef(false);
+  const positionsInFlightRef = useRef(false);
   const lastOverviewFetchAtRef = useRef(0);
   const lastMarketsFetchAtRef = useRef(0);
+  const lastPositionsFetchAtRef = useRef(0);
 
   useEffect(() => {
     handleDataChangeRef.current = handleDataChange;
@@ -160,11 +172,6 @@ function OstiumNodeConfigurationInner({
 
     return options;
   }, [action]);
-
-  const isLegacyAction = useMemo(
-    () => FEATURE_FLAGS.OSTIUM_MINIMAL_PANEL && !OSTIUM_PANEL_ACTIONS.includes(action),
-    [action],
-  );
 
   const refreshMarkets = useCallback(async (force = false) => {
     if (!authenticated || marketsInFlightRef.current) {
@@ -259,6 +266,48 @@ function OstiumNodeConfigurationInner({
     }
   }, [action, authenticated, getPrivyAccessToken, network]);
 
+  const refreshPositions = useCallback(async (force = false) => {
+    if (!authenticated || positionsInFlightRef.current) {
+      return;
+    }
+    if (
+      !force &&
+      Date.now() - lastPositionsFetchAtRef.current < FEATURE_FLAGS.OSTIUM_SETUP_FETCH_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    positionsInFlightRef.current = true;
+    setPositionsState((prev) => ({ ...prev, loading: true, error: null }));
+
+    try {
+      const data = await postOstiumAuthed<{ positions: unknown[] }>(
+        getPrivyAccessToken,
+        API_CONFIG.ENDPOINTS.OSTIUM.POSITIONS,
+        { network },
+        {
+          dedupeInFlight: true,
+          dedupeKey: `ostium:positions:${network}`,
+          cacheMs: FEATURE_FLAGS.OSTIUM_SETUP_FETCH_COOLDOWN_MS,
+        },
+      );
+      lastPositionsFetchAtRef.current = Date.now();
+      setPositionsState({
+        loading: false,
+        error: null,
+        positions: Array.isArray(data.positions) ? data.positions : [],
+      });
+    } catch (error) {
+      setPositionsState({
+        loading: false,
+        error: error instanceof Error ? error.message : "Failed to load Ostium positions",
+        positions: [],
+      });
+    } finally {
+      positionsInFlightRef.current = false;
+    }
+  }, [authenticated, getPrivyAccessToken, network]);
+
   useEffect(() => {
     const updates: Record<string, unknown> = {};
 
@@ -293,8 +342,11 @@ function OstiumNodeConfigurationInner({
     if (!authenticated) return;
     if (action === "OPEN_POSITION" || action === "PRICE") {
       void refreshMarkets(true);
+    } else if (action === "CLOSE_POSITION" || action === "UPDATE_SL" || action === "UPDATE_TP") {
+      void refreshMarkets(true); // Needed for market lookup map
+      void refreshPositions(true);
     }
-  }, [action, authenticated, network, refreshMarkets]);
+  }, [action, authenticated, network, refreshMarkets, refreshPositions]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -308,70 +360,32 @@ function OstiumNodeConfigurationInner({
 
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
-      void refreshOverview();
+      void Promise.all([refreshOverview(), refreshPositions()]);
     }, FEATURE_FLAGS.OSTIUM_SETUP_AUTO_REFRESH_MS);
 
     return () => window.clearInterval(interval);
-  }, [authenticated, refreshOverview]);
+  }, [authenticated, refreshOverview, refreshPositions]);
 
-  const validationErrors = useMemo(() => {
-    const errors: string[] = [];
-
-    if (isLegacyAction) {
-      errors.push("This is a legacy action. Use only if already configured; new setup should use minimal actions.");
+  const marketLookup = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const marketItem of marketsState.markets) {
+      map.set(marketItem.pairId, marketItem.pair);
     }
+    return map;
+  }, [marketsState.markets]);
 
-    if (action === "PRICE" && !base && !market) {
-      errors.push("Price action requires either Base or Market.");
-    }
+  const parsedPositions = useMemo(() => {
+    return positionsState.positions.map((entry, index) => parsePosition(entry, index, marketLookup));
+  }, [marketLookup, positionsState.positions]);
 
-    if (action === "OPEN_POSITION") {
-      if (!market) errors.push("Open position requires Market.");
-      if (!collateral || Number(collateral) <= 0) errors.push("Open position requires positive Collateral.");
-      if (!leverage || Number(leverage) <= 0) errors.push("Open position requires positive Leverage.");
-    }
+  const selectedPositionId = `${pairId}-${tradeIndex}`;
 
-    if (action === "CLOSE_POSITION" || action === "UPDATE_SL" || action === "UPDATE_TP") {
-      if (!pairId) errors.push(`${OSTIUM_ACTION_LABELS[action]} requires Pair ID.`);
-      if (!tradeIndex) errors.push(`${OSTIUM_ACTION_LABELS[action]} requires Trade Index.`);
-    }
-
-    if (action === "UPDATE_SL" && (!slPrice || Number(slPrice) <= 0)) {
-      errors.push("Update SL requires positive Stop-Loss price.");
-    }
-
-    if (action === "UPDATE_TP" && (!tpPrice || Number(tpPrice) <= 0)) {
-      errors.push("Update TP requires positive Take-Profit price.");
-    }
-
-    const readiness = overviewState.data?.readiness;
-
-    if (actionRequiresDelegation(action)) {
-      if (!readiness?.readyForPositionManagement) {
-        errors.push("Ostium setup not ready for write actions. Open Ostium Perps Setup.");
-      }
-    }
-
-    if (actionRequiresAllowance(action)) {
-      if (!readiness?.readyForOpenPosition) {
-        errors.push("Open position requires delegation, allowance, USDC balance, and delegate gas.");
-      }
-    }
-
-    return errors;
-  }, [
-    action,
-    base,
-    collateral,
-    isLegacyAction,
-    leverage,
-    market,
-    overviewState.data?.readiness,
-    pairId,
-    slPrice,
-    tpPrice,
-    tradeIndex,
-  ]);
+  const positionOptions = useMemo(() => {
+    return parsedPositions.map((pos) => ({
+      value: `${pos.pairId}-${pos.tradeIndex}`,
+      label: `${pos.marketLabel} - ${pos.side} (PnL: ${pos.pnl})`,
+    }));
+  }, [parsedPositions]);
 
   const readiness = overviewState.data?.readiness;
   const readyForSelectedAction = useMemo(() => {
@@ -383,90 +397,85 @@ function OstiumNodeConfigurationInner({
 
   const readinessVisual = getReadinessBadge(readyForSelectedAction);
 
-  return (
-    <div className="space-y-4">
-      {!authenticated && (
-        <SimpleCard className="p-4 border-amber-500/20 bg-amber-500/5">
-          <div className="flex gap-3">
-            <LuCircleAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div className="space-y-3 flex-1">
-              <div className="space-y-0.5">
-                <Typography variant="bodySmall" className="font-bold text-foreground">
-                  Action Required
-                </Typography>
-                <Typography variant="caption" className="text-muted-foreground block leading-relaxed">
-                  Sign in to configure Ostium blocks.
-                </Typography>
-              </div>
-              <Button onClick={login} className="w-full bg-amber-500 hover:bg-amber-600 text-black font-bold h-10">
-                Connect Wallet
-              </Button>
-            </div>
-          </div>
-        </SimpleCard>
-      )}
+  if (!authenticated) {
+    return <AuthenticationStatus />;
+  }
 
-      <SimpleCard className="p-4 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <Typography variant="bodySmall" className="font-semibold text-foreground">
-            Effective Account
+  return (
+    <div className="space-y-4 min-h-[60vh] max-h-screen">
+      <SimpleCard className="p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <Typography variant="h5" className="font-semibold text-foreground">
+            Account Details
           </Typography>
           <Button
             type="button"
-            className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-white"
+            className="h-8 px-3 rounded-lg text-xs gap-1.5"
             onClick={() => void refreshOverview(true)}
             disabled={!authenticated || overviewState.loading}
           >
             {overviewState.loading ? (
-              <LuLoader className="w-4 h-4 animate-spin" />
+              <LuLoader className="w-3.5 h-3.5 animate-spin" />
             ) : (
-              <LuRefreshCw className="w-4 h-4" />
+              <LuRefreshCw className="w-3.5 h-3.5" />
             )}
             Refresh
           </Button>
         </div>
 
-        <Typography variant="caption" className="text-muted-foreground block">
-          Network: <span className="text-foreground">{OSTIUM_NETWORK_LABELS[network]}</span>
-        </Typography>
-        <Typography variant="caption" className="text-muted-foreground block">
-          Safe address: <span className="text-foreground font-mono">{readiness?.safeAddress || "-"}</span>
-        </Typography>
-
-        <div className={`rounded-lg border p-2 ${readinessVisual.className}`}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-1.5">
-              {readinessVisual.icon}
-              <Typography variant="caption" className="font-semibold">
-                {readinessVisual.label}
-              </Typography>
+        <div className="rounded-xl border border-white/15 bg-black/20 divide-y divide-white/10">
+          <div className="flex items-center justify-between px-3.5 py-2.5">
+            <span className="text-xs text-muted-foreground font-medium">Network</span>
+            <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${network === "mainnet" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
+              {OSTIUM_NETWORK_LABELS[network]}
+            </span>
+          </div>
+          <div className="flex items-center justify-between px-3.5 py-2.5">
+            <span className="text-xs text-muted-foreground font-medium">Address</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs text-foreground font-mono truncate">
+                {readiness?.safeAddress
+                  ? `${readiness.safeAddress.slice(0, 6)}…${readiness.safeAddress.slice(-4)}`
+                  : "-"}
+              </span>
+              {readiness?.safeAddress && (
+                <CopyButton text={readiness.safeAddress} size="sm" />
+              )}
             </div>
-            {FEATURE_FLAGS.OSTIUM_SETUP_PAGE_ENABLED ? (
-              <Link href="/ostium-perps" className="inline-flex items-center gap-1 text-xs underline underline-offset-2">
-                Open Ostium Perps Setup
-                <LuArrowUpRight className="w-3 h-3" />
-              </Link>
-            ) : (
-              <Typography variant="caption" className="text-xs">
-                Setup page disabled by feature flag
-              </Typography>
-            )}
+          </div>
+          <div className="flex items-center justify-between px-3.5 py-2.5">
+            <span className="text-xs text-muted-foreground font-medium">Action Status</span>
+            <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${readinessVisual.className}`}>
+              {readinessVisual.label}
+            </div>
           </div>
         </div>
 
+        {FEATURE_FLAGS.OSTIUM_SETUP_PAGE_ENABLED && (
+          <div className="mt-3 flex justify-center">
+            <Link
+              href="/ostium"
+              className="inline-flex items-center underline gap-1.5 text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors"
+            >
+              Open Ostium Perpectual Setup
+              <LuArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
+
         {overviewState.error && (
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-            <LuCircleAlert className="w-4 h-4 text-red-400 mt-0.5" />
-            <Typography variant="caption" className="text-red-300">
+          <div className="flex items-start gap-2 p-2.5 mt-3 rounded-lg bg-destructive/10 border border-destructive/20">
+            <LuCircleAlert className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+            <Typography variant="caption" className="text-destructive">
               {overviewState.error}
             </Typography>
           </div>
         )}
       </SimpleCard>
 
-      <SimpleCard className="p-4 space-y-4">
-        <Typography variant="bodySmall" className="font-semibold text-foreground">
-          Perps Configuration
+      <SimpleCard className="p-5 space-y-4">
+        <Typography variant="h5" className="font-semibold text-foreground">
+          Perpetual Actions
         </Typography>
 
         <Dropdown
@@ -476,163 +485,224 @@ function OstiumNodeConfigurationInner({
           placeholder="Select action"
         />
 
-        {(action === "OPEN_POSITION" || action === "PRICE") && (
-          <>
-            <div className="flex items-center justify-between">
-              <Typography variant="caption" className="text-muted-foreground">
-                Market
-              </Typography>
-              <button
-                type="button"
-                className="text-xs text-blue-300 hover:text-blue-200 inline-flex items-center gap-1"
-                onClick={() => void refreshMarkets(true)}
-                disabled={marketsState.loading || !authenticated}
-              >
-                {marketsState.loading ? (
-                  <LuLoader className="w-3 h-3 animate-spin" />
-                ) : (
-                  <LuRefreshCw className="w-3 h-3" />
-                )}
-                Refresh
-              </button>
+        {(action === "MARKETS" || action === "BALANCE" || action === "LIST_POSITIONS") && (
+          <div className="rounded-xl border border-white/15 bg-black/20 p-3.5 shadow-sm">
+            <div className="flex items-start gap-2.5">
+              <LuInfo className="w-4 h-4 text-amber-400/70 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <Typography variant="caption" className="text-foreground font-medium">
+                  No configuration needed
+                </Typography>
+                <Typography variant="caption" className="text-muted-foreground leading-relaxed">
+                  {action === "MARKETS" && "This action will fetch all available Ostium markets and their current status."}
+                  {action === "BALANCE" && "This action will retrieve the USDC balance of your Safe wallet."}
+                  {action === "LIST_POSITIONS" && "This action will list all your open positions on Ostium."}
+                </Typography>
+              </div>
             </div>
-            {marketOptions.length > 0 ? (
-              <Dropdown
-                value={market}
-                onChange={(e) => handleDataChange({ market: e.target.value })}
-                options={marketOptions}
-                placeholder="Select market"
-              />
-            ) : (
-              <Input
-                value={market}
-                onChange={(e) => handleDataChange({ market: e.target.value })}
-                placeholder="e.g. BTC, ETH, XAU"
-                className="bg-white/5 border-white/15"
-              />
-            )}
-          </>
-        )}
-
-        {action === "PRICE" && (
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={base}
-              onChange={(e) => handleDataChange({ base: e.target.value.toUpperCase() })}
-              placeholder="Base (e.g. BTC)"
-              className="bg-white/5 border-white/15"
-            />
-            <Input
-              value={quote}
-              onChange={(e) => handleDataChange({ quote: e.target.value.toUpperCase() })}
-              placeholder="Quote (USD)"
-              className="bg-white/5 border-white/15"
-            />
           </div>
         )}
 
         {action === "OPEN_POSITION" && (
-          <>
-            <Dropdown
-              value={side}
-              onChange={(e) => handleDataChange({ side: e.target.value })}
-              options={[
-                { value: "long", label: "Long" },
-                { value: "short", label: "Short" },
-              ]}
-              placeholder="Select side"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                value={collateral}
-                onChange={(e) => handleDataChange({ collateral: e.target.value })}
-                placeholder="Collateral (USDC)"
-                className="bg-white/5 border-white/15"
-              />
-              <Input
-                value={leverage}
-                onChange={(e) => handleDataChange({ leverage: e.target.value })}
-                placeholder="Leverage"
-                className="bg-white/5 border-white/15"
-              />
+          <div className="rounded-xl border border-white/15 bg-black/20 p-3.5 space-y-4 shadow-sm">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  Market Entry
+                </Typography>
+                <button
+                  type="button"
+                  className="text-[11px] text-amber-500/70 hover:text-amber-400 inline-flex items-center gap-1 font-medium transition-colors"
+                  onClick={() => void refreshMarkets(true)}
+                  disabled={marketsState.loading || !authenticated}
+                >
+                  {marketsState.loading ? (
+                    <LuLoader className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <LuRefreshCw className="w-3 h-3" />
+                  )}
+                  Refresh list
+                </button>
+              </div>
+              {marketOptions.length > 0 ? (
+                <Dropdown
+                  value={market}
+                  onChange={(e) => handleDataChange({ market: e.target.value })}
+                  options={marketOptions}
+                  placeholder="Select market to trade"
+                />
+              ) : (
+                <Input
+                  value={market}
+                  onChange={(e) => handleDataChange({ market: e.target.value })}
+                  placeholder="e.g. BTC, ETH, XAU"
+                />
+              )}
             </div>
-          </>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5 flex flex-col justify-end">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  Direction
+                </Typography>
+                <Dropdown
+                  value={side}
+                  onChange={(e) => handleDataChange({ side: e.target.value })}
+                  options={[
+                    { value: "long", label: "Long" },
+                    { value: "short", label: "Short" },
+                  ]}
+                  placeholder="Select side"
+                />
+              </div>
+              <div className="space-y-1.5 flex flex-col justify-end">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  Leverage
+                </Typography>
+                <div className="relative">
+                  <Input
+                    value={leverage}
+                    onChange={(e) => handleDataChange({ leverage: e.target.value })}
+                    placeholder="2.5"
+                    className="pr-6"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">x</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Typography variant="caption" className="text-muted-foreground font-medium">
+                Collateral Amount
+              </Typography>
+              <div className="relative">
+                <Input
+                  value={collateral}
+                  onChange={(e) => handleDataChange({ collateral: e.target.value })}
+                  placeholder="100.00"
+                  className="pr-12"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-foreground font-medium bg-white/5 px-1.5 py-0.5 rounded border border-white/10">
+                  USDC
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {action === "PRICE" && (
+          <div className="rounded-xl border border-white/15 bg-black/20 p-3.5 shadow-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  Base Asset
+                </Typography>
+                <Input
+                  value={base}
+                  onChange={(e) => handleDataChange({ base: e.target.value.toUpperCase() })}
+                  placeholder="e.g. BTC"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  Quote Currency
+                </Typography>
+                <Input
+                  value={quote}
+                  onChange={(e) => handleDataChange({ quote: e.target.value.toUpperCase() })}
+                  placeholder="USD"
+                />
+              </div>
+            </div>
+          </div>
         )}
 
         {(action === "CLOSE_POSITION" || action === "UPDATE_SL" || action === "UPDATE_TP") && (
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              value={pairId}
-              onChange={(e) => handleDataChange({ pairId: e.target.value })}
-              placeholder="Pair ID"
-              className="bg-white/5 border-white/15"
-            />
-            <Input
-              value={tradeIndex}
-              onChange={(e) => handleDataChange({ tradeIndex: e.target.value })}
-              placeholder="Trade Index"
-              className="bg-white/5 border-white/15"
-            />
+          <div className="rounded-xl border border-white/15 bg-black/20 p-3.5 space-y-4 shadow-sm">
+            <div className="space-y-3 pb-3 border-b border-white/10">
+              <div className="flex items-center justify-between">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  Active Position
+                </Typography>
+                <button
+                  type="button"
+                  className="text-[11px] text-amber-500/70 hover:text-amber-400 inline-flex items-center gap-1 font-medium transition-colors"
+                  onClick={() => void refreshPositions(true)}
+                  disabled={positionsState.loading || !authenticated}
+                >
+                  {positionsState.loading ? (
+                    <LuLoader className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <LuRefreshCw className="w-3 h-3" />
+                  )}
+                  Refresh list
+                </button>
+              </div>
+
+              {positionOptions.length > 0 ? (
+                <Dropdown
+                  value={selectedPositionId}
+                  onChange={(e) => {
+                    const [pId, tIndex] = e.target.value.split("-");
+                    handleDataChange({
+                      pairId: pId,
+                      tradeIndex: tIndex,
+                    });
+                  }}
+                  options={positionOptions}
+                  placeholder="Select open position"
+                />
+              ) : (
+                <div className="text-sm text-muted-foreground/80 py-2">
+                  No open positions found.
+                </div>
+              )}
+            </div>
+
+            {action === "UPDATE_SL" && (
+              <div className="space-y-1.5">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  New Stop-Loss Price
+                </Typography>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">$</span>
+                  <Input
+                    value={slPrice}
+                    onChange={(e) => handleDataChange({ slPrice: e.target.value })}
+                    placeholder="Price trigger"
+                    className="pl-6"
+                  />
+                </div>
+              </div>
+            )}
+
+            {action === "UPDATE_TP" && (
+              <div className="space-y-1.5">
+                <Typography variant="caption" className="text-muted-foreground font-medium">
+                  New Take-Profit Price
+                </Typography>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">$</span>
+                  <Input
+                    value={tpPrice}
+                    onChange={(e) => handleDataChange({ tpPrice: e.target.value })}
+                    placeholder="Price target"
+                    className="pl-6"
+                  />
+                </div>
+              </div>
+            )}
+
+            {action === "CLOSE_POSITION"}
           </div>
-        )}
-
-        {action === "UPDATE_SL" && (
-          <Input
-            value={slPrice}
-            onChange={(e) => handleDataChange({ slPrice: e.target.value })}
-            placeholder="Stop-loss price"
-            className="bg-white/5 border-white/15"
-          />
-        )}
-
-        {action === "UPDATE_TP" && (
-          <Input
-            value={tpPrice}
-            onChange={(e) => handleDataChange({ tpPrice: e.target.value })}
-            placeholder="Take-profit price"
-            className="bg-white/5 border-white/15"
-          />
-        )}
-
-        {(action === "OPEN_POSITION" || action === "CLOSE_POSITION") && (
-          <Input
-            value={toTrimmedString(nodeData.idempotencyKey)}
-            onChange={(e) => handleDataChange({ idempotencyKey: e.target.value })}
-            placeholder="Idempotency key (optional)"
-            className="bg-white/5 border-white/15"
-          />
         )}
 
         {marketsState.error && (
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-            <LuCircleAlert className="w-4 h-4 text-red-400 mt-0.5" />
-            <Typography variant="caption" className="text-red-300">
+          <div className="flex items-start gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 mt-2">
+            <LuCircleAlert className="w-4 h-4 text-destructive mt-0.5 shrink-0" />
+            <Typography variant="caption" className="text-destructive">
               {marketsState.error}
             </Typography>
-          </div>
-        )}
-      </SimpleCard>
-
-      <SimpleCard className="p-4 space-y-2">
-        <Typography variant="bodySmall" className="font-semibold text-foreground">
-          Preflight Checks
-        </Typography>
-        {validationErrors.length === 0 ? (
-          <div className="flex items-center gap-2 text-green-300">
-            <LuCircleCheck className="w-4 h-4" />
-            <Typography variant="caption">Configuration looks valid.</Typography>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {validationErrors.map((entry) => (
-              <div
-                key={entry}
-                className="flex items-start gap-2 text-amber-200 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2"
-              >
-                <LuCircleAlert className="w-4 h-4 mt-0.5" />
-                <Typography variant="caption">{entry}</Typography>
-              </div>
-            ))}
           </div>
         )}
       </SimpleCard>
@@ -646,7 +716,7 @@ export function OstiumNodeConfiguration(props: OstiumNodeConfigurationProps) {
       fallback={(error, reset) => (
         <SimpleCard className="p-4 space-y-3">
           <Typography variant="bodySmall" className="font-semibold text-foreground">
-            Ostium Configuration Error
+            Ostium Error
           </Typography>
           <Typography variant="caption" className="text-destructive">
             {error.message}
