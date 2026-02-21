@@ -37,24 +37,7 @@ export const hyperliquidBlock: ComingSoonBlockDefinition = {
     ],
 };
 
-export const ostiumBlock: ComingSoonBlockDefinition = {
-    id: "ostium",
-    label: "Ostium",
-    iconName: "OstiumLogo",
-    description: "RWA perpetuals for forex & commodities",
-    category: "perpetuals",
-    isComingSoon: true,
-    protocolUrl: "https://ostium.io",
-    automationCapabilities: [
-        "Real-world asset trading automation",
-        "Forex strategy execution",
-        "Commodity price tracking",
-        "Multi-asset portfolio automation",
-    ],
-};
-
 export const perpetualBlocks: ComingSoonBlockDefinition[] = [
     gmxBlock,
     hyperliquidBlock,
-    ostiumBlock,
 ];

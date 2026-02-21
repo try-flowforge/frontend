@@ -17,12 +17,14 @@ import { WalletNodeConfiguration } from "@/blocks/configs/wallet/WalletNodeConfi
 import { TelegramNodeConfiguration } from "@/blocks/configs/social/telegram/TelegramNodeConfiguration";
 import { useSearchParams } from "next/navigation";
 import { TransactionSigner } from "./TransactionSigner";
+import { ExecutionTransactionSigner } from "./ExecutionTransactionSigner";
 
 type OnboardingStep = 1 | 2;
 
 export default function AgentOnboardingPageClient() {
   const searchParams = useSearchParams();
   const intentId = searchParams.get("intentId");
+  const executionId = searchParams.get("executionId");
 
   const { ready, authenticated, login } = usePrivy();
   const { wallets } = useWallets();
@@ -72,7 +74,20 @@ export default function AgentOnboardingPageClient() {
 
   const activeStep = steps.find((s) => s.id === step) ?? steps[0];
 
-  // If there's an intentId in the URL, act as the magic-link destination
+  // If there's an intentId/executionId in the URL, act as the signing destination
+  if (executionId) {
+    return (
+      <div className="space-y-6 max-w-xl mx-auto">
+        <div className="p-6 sm:p-7">
+          <Typography variant="h1" className="text-foreground" align="center">
+            Blockchain Agent Action
+          </Typography>
+        </div>
+        <ExecutionTransactionSigner executionId={executionId} />
+      </div>
+    );
+  }
+
   if (intentId) {
     return (
       <div className="space-y-6 max-w-xl mx-auto">

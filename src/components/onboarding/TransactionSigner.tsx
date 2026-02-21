@@ -33,6 +33,12 @@ interface TransactionIntent {
     createdAt: string;
 }
 
+interface IntentResponsePayload {
+    success?: boolean;
+    data?: TransactionIntent;
+    error?: string;
+}
+
 export function TransactionSigner({ intentId }: { intentId: string }) {
     const { ready, authenticated, login } = usePrivy();
     const { getPrivyAccessToken, ethereumProvider } = usePrivyWallet();
@@ -53,8 +59,12 @@ export function TransactionSigner({ intentId }: { intentId: string }) {
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
             const response = await fetch(`${buildApiUrl('/intents')}/${intentId}`, { headers });
-            let data: any = null;
-            try { data = await response.json(); } catch (_) { /* not json */ }
+            let data: IntentResponsePayload | null = null;
+            try {
+                data = (await response.json()) as IntentResponsePayload;
+            } catch {
+                // non-JSON response
+            }
 
             if (!response.ok) throw new Error(data?.error || "Failed to load transaction details.");
             if (!data?.success) throw new Error(data?.error || "Failed to load transaction details.");
@@ -82,7 +92,7 @@ export function TransactionSigner({ intentId }: { intentId: string }) {
 
             // Ensure the user's wallet is on the correct chain
             try {
-                await (ethereumProvider as any)?.request({
+                await ethereumProvider.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: `0x${intent.chainId.toString(16)}` }],
                 });
@@ -92,7 +102,7 @@ export function TransactionSigner({ intentId }: { intentId: string }) {
 
             // Sign the pre-built Safe transaction hash — this is all the frontend needs to do
             const provider = new (await import('ethers')).ethers.BrowserProvider(
-                ethereumProvider as unknown as any
+                ethereumProvider as unknown as import('ethers').Eip1193Provider
             );
             const signer = await provider.getSigner();
             const signature = await signer.signMessage(

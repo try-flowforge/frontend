@@ -165,6 +165,36 @@ export interface OracleNodeData extends BaseNodeData {
     lastFetchedAt?: string;
 }
 
+// Perps Node Data (Ostium)
+export interface PerpsNodeData extends BaseNodeData {
+    provider?: "OSTIUM";
+    network?: "testnet" | "mainnet";
+    action?:
+    | "MARKETS"
+    | "PRICE"
+    | "BALANCE"
+    | "LIST_POSITIONS"
+    | "OPEN_POSITION"
+    | "CLOSE_POSITION"
+    | "UPDATE_SL"
+    | "UPDATE_TP";
+    market?: string;
+    base?: string;
+    quote?: string;
+    address?: string;
+    traderAddress?: string;
+    side?: "long" | "short";
+    collateral?: string | number;
+    leverage?: string | number;
+    pairId?: string | number;
+    tradeIndex?: string | number;
+    slPrice?: string | number;
+    tpPrice?: string | number;
+    idempotencyKey?: string;
+    delegationStatus?: "UNKNOWN" | "PENDING" | "ACTIVE" | "REVOKED" | "FAILED";
+    delegationCheckedAt?: string;
+}
+
 // Discriminated union for all node types
 export type WorkflowNodeData =
     | ({ nodeType: "slack" } & SlackNodeData)
@@ -181,6 +211,7 @@ export type WorkflowNodeData =
     | ({ nodeType: "compound" } & LendingNodeData)
     | ({ nodeType: "chainlink" } & OracleNodeData)
     | ({ nodeType: "pyth" } & OracleNodeData)
+    | ({ nodeType: "ostium" } & PerpsNodeData)
     | ({ nodeType: "ai-transform" } & AiTransformNodeData)
     | ({ nodeType: "base" } & BaseNodeData);
 
@@ -254,5 +285,13 @@ export function isAiTransformNodeData(data: unknown): data is AiTransformNodeDat
         typeof data === "object" &&
         data !== null &&
         ("provider" in data || "model" in data || "userPromptTemplate" in data)
+    );
+}
+
+export function isPerpsNodeData(data: unknown): data is PerpsNodeData {
+    return (
+        typeof data === "object" &&
+        data !== null &&
+        ("network" in data || "action" in data || "market" in data)
     );
 }
