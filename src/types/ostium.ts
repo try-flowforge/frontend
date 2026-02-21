@@ -51,3 +51,34 @@ export function actionRequiresDelegation(action: OstiumAction): boolean {
     action === "UPDATE_TP"
   );
 }
+
+export function actionRequiresAllowance(action: OstiumAction): boolean {
+  return action === "OPEN_POSITION";
+}
+
+export interface OstiumReadinessCheck {
+  ok: boolean;
+  message: string;
+}
+
+export interface OstiumReadiness {
+  network: OstiumNetwork;
+  chainId: number;
+  safeAddress: string | null;
+  delegateAddress: string | null;
+  contracts: {
+    usdc: string;
+    trading: string;
+    tradingStorage: string;
+  };
+  checks: {
+    safeWallet: OstiumReadinessCheck & { address: string | null };
+    delegation: OstiumReadinessCheck & { status: string | null };
+    usdcBalance: OstiumReadinessCheck & { balance: string | null };
+    allowance: OstiumReadinessCheck & { amount: string | null; spender: string };
+    delegateGas: OstiumReadinessCheck & { balance: string | null; address: string | null };
+  };
+  readyForOpenPosition: boolean;
+  readyForPositionManagement: boolean;
+  refreshedAt: string;
+}

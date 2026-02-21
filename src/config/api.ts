@@ -68,6 +68,9 @@ export const API_CONFIG = {
       DELEGATION_STATUS: "/ostium/delegations/status",
       DELEGATION_REVOKE_PREPARE: "/ostium/delegations/revoke/prepare",
       DELEGATION_REVOKE_EXECUTE: "/ostium/delegations/revoke/execute",
+      READINESS: "/ostium/readiness",
+      ALLOWANCE_PREPARE: "/ostium/allowance/prepare",
+      ALLOWANCE_EXECUTE: "/ostium/allowance/execute",
     },
     USERS: {
       ME: "/users/me",

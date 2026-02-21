@@ -24,12 +24,14 @@ import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 import { API_CONFIG, buildApiUrl } from "@/config/api";
 import { getChain } from "@/web3/config/chain-registry";
 import {
+  actionRequiresAllowance,
   actionRequiresDelegation,
   OSTIUM_ACTION_LABELS,
   OSTIUM_ACTIONS,
   OSTIUM_NETWORK_LABELS,
   OstiumAction,
   OstiumNetwork,
+  OstiumReadiness,
 } from "@/types/ostium";
 
 interface OstiumNodeConfigurationProps {
@@ -60,6 +62,8 @@ interface SafeTxData {
   data: string;
   operation: number;
 }
+
+type ReadinessKey = keyof OstiumReadiness["checks"];
 
 function toTrimmedString(value: unknown): string {
   if (typeof value === "string") return value;
@@ -114,6 +118,25 @@ function getDelegationStatusVisual(status: string | null): {
     label: "Unknown",
     className: "text-zinc-300 bg-white/5 border-white/10",
     icon: <LuShield className="w-4 h-4" />,
+  };
+}
+
+function getReadinessCheckVisual(ok: boolean): {
+  className: string;
+  label: string;
+  icon: React.ReactNode;
+} {
+  if (ok) {
+    return {
+      className: "text-green-300 bg-green-500/10 border-green-500/20",
+      label: "Ready",
+      icon: <LuCircleCheck className="w-4 h-4" />,
+    };
+  }
+  return {
+    className: "text-amber-200 bg-amber-500/10 border-amber-500/20",
+    label: "Action Required",
+    icon: <LuCircleAlert className="w-4 h-4" />,
   };
 }
 
@@ -178,6 +201,19 @@ function OstiumNodeConfigurationInner({
     "approve" | "revoke" | null
   >(null);
 
+  const [readinessState, setReadinessState] = useState<{
+    loading: boolean;
+    error: string | null;
+    data: OstiumReadiness | null;
+  }>({
+    loading: false,
+    error: null,
+    data: null,
+  });
+
+  const [allowanceActionLoading, setAllowanceActionLoading] = useState<boolean>(false);
+  const [allowanceActionMessage, setAllowanceActionMessage] = useState<string | null>(null);
+
   const callAuthedPost = useCallback(
     async <T,>(endpoint: string, payload: Record<string, unknown>): Promise<T> => {
       const accessToken = await getPrivyAccessToken();
@@ -215,6 +251,43 @@ function OstiumNodeConfigurationInner({
     [marketsState.markets],
   );
 
+  const actionRequiresPositionManagement = useMemo(
+    () => actionRequiresDelegation(action),
+    [action],
+  );
+
+  const readinessData = readinessState.data;
+  const readinessRows: Array<{ key: ReadinessKey; label: string; message: string }> = useMemo(() => {
+    if (!readinessData) return [];
+    return [
+      {
+        key: "safeWallet",
+        label: "Safe Wallet",
+        message: readinessData.checks.safeWallet.message,
+      },
+      {
+        key: "delegation",
+        label: "Delegation",
+        message: readinessData.checks.delegation.message,
+      },
+      {
+        key: "usdcBalance",
+        label: "Safe USDC Balance",
+        message: readinessData.checks.usdcBalance.message,
+      },
+      {
+        key: "allowance",
+        label: "USDC Allowance",
+        message: readinessData.checks.allowance.message,
+      },
+      {
+        key: "delegateGas",
+        label: "Delegate Gas",
+        message: readinessData.checks.delegateGas.message,
+      },
+    ];
+  }, [readinessData]);
+
   const validationErrors = useMemo(() => {
     const errors: string[] = [];
 
@@ -249,21 +322,47 @@ function OstiumNodeConfigurationInner({
       errors.push("Update TP requires positive Take-Profit price.");
     }
 
-    if (actionRequiresDelegation(action) && delegationStatusFromNode !== "ACTIVE") {
-      errors.push("Delegation must be ACTIVE for write actions.");
+    if (actionRequiresPositionManagement) {
+      if (!readinessData) {
+        errors.push("Run Ostium readiness check before write actions.");
+      } else {
+        if (!readinessData.checks.safeWallet.ok) {
+          errors.push(readinessData.checks.safeWallet.message);
+        }
+        if (!readinessData.checks.delegation.ok) {
+          errors.push(readinessData.checks.delegation.message);
+        }
+        if (!readinessData.checks.delegateGas.ok) {
+          errors.push(readinessData.checks.delegateGas.message);
+        }
+      }
+    }
+
+    if (actionRequiresAllowance(action)) {
+      if (!readinessData) {
+        errors.push("Run Ostium readiness check before opening position.");
+      } else {
+        if (!readinessData.checks.usdcBalance.ok) {
+          errors.push(readinessData.checks.usdcBalance.message);
+        }
+        if (!readinessData.checks.allowance.ok) {
+          errors.push(readinessData.checks.allowance.message);
+        }
+      }
     }
 
     return errors;
   }, [
     action,
+    actionRequiresPositionManagement,
     address,
     base,
     collateral,
-    delegationStatusFromNode,
     effectiveAddress,
     leverage,
     market,
     pairId,
+    readinessData,
     slPrice,
     tpPrice,
     tradeIndex,
@@ -340,6 +439,85 @@ function OstiumNodeConfigurationInner({
     }
   }, [authenticated, callAuthedPost, handleDataChange, network]);
 
+  const refreshReadiness = useCallback(async () => {
+    if (!authenticated) {
+      return;
+    }
+
+    setReadinessState((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+    }));
+
+    try {
+      const data = await callAuthedPost<OstiumReadiness>(
+        API_CONFIG.ENDPOINTS.OSTIUM.READINESS,
+        { network },
+      );
+      setReadinessState({
+        loading: false,
+        error: null,
+        data,
+      });
+    } catch (error) {
+      setReadinessState({
+        loading: false,
+        error: error instanceof Error ? error.message : "Failed to fetch readiness status",
+        data: null,
+      });
+    }
+  }, [authenticated, callAuthedPost, network]);
+
+  const signAndExecuteSafeFlow = useCallback(
+    async (
+      prepared: { safeAddress: string; safeTxHash: string; safeTxData: SafeTxData },
+      executeEndpoint: string,
+      extraPayload: Record<string, unknown> = {},
+    ) => {
+      if (!ethereumProvider) {
+        throw new Error("Ethereum provider unavailable. Reconnect wallet and try again.");
+      }
+
+      const safeSdk = await Safe.init({
+        provider: ethereumProvider as unknown as ethers.Eip1193Provider,
+        safeAddress: prepared.safeAddress,
+      });
+
+      const safeTransaction = await safeSdk.createTransaction({
+        transactions: [
+          {
+            to: prepared.safeTxData.to,
+            value: prepared.safeTxData.value,
+            data: prepared.safeTxData.data,
+            operation: prepared.safeTxData.operation,
+          },
+        ],
+      });
+
+      const signedSafeTx = await safeSdk.signTransaction(safeTransaction);
+      const signedTxHash = await safeSdk.getTransactionHash(signedSafeTx);
+
+      if (signedTxHash.toLowerCase() !== prepared.safeTxHash.toLowerCase()) {
+        throw new Error(
+          `Safe tx hash mismatch. Backend=${prepared.safeTxHash} Frontend=${signedTxHash}`,
+        );
+      }
+
+      const signature = signedSafeTx.encodedSignatures();
+      if (!signature || signature === "0x") {
+        throw new Error("Failed to produce Safe signature.");
+      }
+
+      await callAuthedPost(executeEndpoint, {
+        network,
+        signature,
+        ...extraPayload,
+      });
+    },
+    [callAuthedPost, ethereumProvider, network],
+  );
+
   const executeDelegationFlow = useCallback(
     async (mode: "approve" | "revoke") => {
       if (!selectedSafe) {
@@ -382,39 +560,9 @@ function OstiumNodeConfigurationInner({
           safeTxHash: string;
           safeTxData: SafeTxData;
         }>(prepareEndpoint, { network });
-
-        const safeSdk = await Safe.init({
-          provider: ethereumProvider as unknown as ethers.Eip1193Provider,
-          safeAddress: prepared.safeAddress,
-        });
-
-        const safeTransaction = await safeSdk.createTransaction({
-          transactions: [
-            {
-              to: prepared.safeTxData.to,
-              value: prepared.safeTxData.value,
-              data: prepared.safeTxData.data,
-              operation: prepared.safeTxData.operation,
-            },
-          ],
-        });
-
-        const signedSafeTx = await safeSdk.signTransaction(safeTransaction);
-        const signedTxHash = await safeSdk.getTransactionHash(signedSafeTx);
-
-        if (signedTxHash.toLowerCase() !== prepared.safeTxHash.toLowerCase()) {
-          throw new Error(
-            `Safe tx hash mismatch. Backend=${prepared.safeTxHash} Frontend=${signedTxHash}`,
-          );
-        }
-
-        const signature = signedSafeTx.encodedSignatures();
-        if (!signature || signature === "0x") {
-          throw new Error("Failed to produce Safe signature.");
-        }
-
-        await callAuthedPost(executeEndpoint, { network, signature });
+        await signAndExecuteSafeFlow(prepared, executeEndpoint);
         await refreshDelegationStatus();
+        await refreshReadiness();
 
         setDelegationState((prev) => ({
           ...prev,
@@ -432,8 +580,59 @@ function OstiumNodeConfigurationInner({
         setDelegationActionLoading(null);
       }
     },
-    [callAuthedPost, ethereumProvider, network, refreshDelegationStatus, selectedSafe],
+    [
+      callAuthedPost,
+      ethereumProvider,
+      network,
+      refreshDelegationStatus,
+      refreshReadiness,
+      selectedSafe,
+      signAndExecuteSafeFlow,
+    ],
   );
+
+  const executeAllowanceFlow = useCallback(async () => {
+    if (!selectedSafe) {
+      setAllowanceActionMessage("Select a Safe wallet before setting allowance.");
+      return;
+    }
+
+    if (!ethereumProvider) {
+      setAllowanceActionMessage("Ethereum provider unavailable. Reconnect wallet and try again.");
+      return;
+    }
+
+    setAllowanceActionLoading(true);
+    setAllowanceActionMessage(null);
+
+    try {
+      const prepared = await callAuthedPost<{
+        safeAddress: string;
+        safeTxHash: string;
+        safeTxData: SafeTxData;
+      }>(API_CONFIG.ENDPOINTS.OSTIUM.ALLOWANCE_PREPARE, { network });
+
+      await signAndExecuteSafeFlow(prepared, API_CONFIG.ENDPOINTS.OSTIUM.ALLOWANCE_EXECUTE, {
+        safeTxHash: prepared.safeTxHash,
+        safeTxData: prepared.safeTxData,
+      });
+      await refreshReadiness();
+      setAllowanceActionMessage("USDC allowance approved successfully.");
+    } catch (error) {
+      setAllowanceActionMessage(
+        error instanceof Error ? error.message : "USDC allowance approval failed",
+      );
+    } finally {
+      setAllowanceActionLoading(false);
+    }
+  }, [
+    callAuthedPost,
+    ethereumProvider,
+    network,
+    refreshReadiness,
+    selectedSafe,
+    signAndExecuteSafeFlow,
+  ]);
 
   useEffect(() => {
     const updates: Record<string, unknown> = {};
@@ -469,6 +668,12 @@ function OstiumNodeConfigurationInner({
     if (!authenticated) return;
     refreshMarkets();
   }, [authenticated, network, refreshMarkets]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    refreshDelegationStatus();
+    refreshReadiness();
+  }, [authenticated, network, refreshDelegationStatus, refreshReadiness]);
 
   const delegationVisual = getDelegationStatusVisual(
     delegationState.status?.status || delegationStatusFromNode || null,
@@ -792,6 +997,118 @@ function OstiumNodeConfigurationInner({
           <Typography variant="caption" className="text-amber-300">
             Select a Safe wallet to approve/revoke delegation.
           </Typography>
+        )}
+      </SimpleCard>
+
+      <SimpleCard className="p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <Typography variant="bodySmall" className="font-semibold text-foreground">
+            Ostium Readiness
+          </Typography>
+          <Button
+            type="button"
+            className="h-8 px-3 rounded-lg bg-white/10 hover:bg-white/15 text-white"
+            onClick={refreshReadiness}
+            disabled={readinessState.loading || !authenticated}
+          >
+            {readinessState.loading ? (
+              <LuLoader className="w-4 h-4 animate-spin" />
+            ) : (
+              <LuRefreshCw className="w-4 h-4" />
+            )}
+            Refresh
+          </Button>
+        </div>
+
+        {readinessData ? (
+          <div className="space-y-2">
+            {readinessRows.map((entry) => {
+              const check = readinessData.checks[entry.key];
+              const visual = getReadinessCheckVisual(check.ok);
+              return (
+                <div
+                  key={entry.key}
+                  className={`rounded-lg border p-2 ${visual.className}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="inline-flex items-center gap-1.5">
+                      {visual.icon}
+                      <Typography variant="caption" className="font-semibold">
+                        {entry.label}
+                      </Typography>
+                    </div>
+                    <Typography variant="caption" className="opacity-90">
+                      {visual.label}
+                    </Typography>
+                  </div>
+                  <Typography variant="caption" className="block mt-1 opacity-90">
+                    {entry.message}
+                  </Typography>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <Typography variant="caption" className="text-muted-foreground">
+            Run readiness check to see Safe, delegation, allowance, and funding status.
+          </Typography>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            className="h-9 px-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+            onClick={executeAllowanceFlow}
+            disabled={
+              !authenticated ||
+              !selectedSafe ||
+              !ethereumProvider ||
+              allowanceActionLoading ||
+              (readinessData?.checks.allowance.ok ?? false)
+            }
+          >
+            {allowanceActionLoading ? (
+              <LuLoader className="w-4 h-4 animate-spin" />
+            ) : (
+              <LuShieldCheck className="w-4 h-4" />
+            )}
+            {readinessData?.checks.allowance.ok ? "Allowance Ready" : "Approve USDC Allowance"}
+          </Button>
+        </div>
+
+        {readinessState.error && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+            <LuCircleAlert className="w-4 h-4 text-red-400 mt-0.5" />
+            <Typography variant="caption" className="text-red-300">
+              {readinessState.error}
+            </Typography>
+          </div>
+        )}
+
+        {allowanceActionMessage && (
+          <div
+            className={`flex items-start gap-2 p-3 rounded-lg border ${
+              allowanceActionMessage.toLowerCase().includes("success")
+                ? "bg-green-500/10 border-green-500/20"
+                : "bg-amber-500/10 border-amber-500/20"
+            }`}
+          >
+            {allowanceActionMessage.toLowerCase().includes("success") ? (
+              <LuCircleCheck className="w-4 h-4 text-green-400 mt-0.5" />
+            ) : (
+              <LuCircleAlert className="w-4 h-4 text-amber-300 mt-0.5" />
+            )}
+            <Typography
+              variant="caption"
+              className={
+                allowanceActionMessage.toLowerCase().includes("success")
+                  ? "text-green-300"
+                  : "text-amber-200"
+              }
+            >
+              {allowanceActionMessage}
+            </Typography>
+          </div>
         )}
       </SimpleCard>
 
