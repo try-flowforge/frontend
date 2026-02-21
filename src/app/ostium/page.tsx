@@ -33,9 +33,11 @@ export default function OstiumPerpsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <NavBar />
-      <OstiumPerpsSetupClient />
+      <main className="mt-40 flex-1">
+        <OstiumPerpsSetupClient />
+      </main>
     </div>
   );
 }

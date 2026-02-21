@@ -245,7 +245,10 @@ export function parsePosition(
   const record = toRecord(value) ?? {};
   const candidates = collectCandidates(record);
 
-  const pairIdRaw = readNumber(candidates, [
+  const pairRecord = toRecord(record.pair);
+  const explicitPairId = pairRecord && "id" in pairRecord ? Number(pairRecord.id) : null;
+
+  const pairIdRaw = explicitPairId ?? readNumber(candidates, [
     "pairId",
     "pair_id",
     "pairIndex",
@@ -262,15 +265,20 @@ export function parsePosition(
     "trade_id",
   ]);
 
-  const pairId = pairIdRaw === null ? null : Math.trunc(pairIdRaw);
-  const tradeIndex = tradeIndexRaw === null ? null : Math.trunc(tradeIndexRaw);
+  const pairId = pairIdRaw === null || isNaN(pairIdRaw) ? null : Math.trunc(pairIdRaw);
+  const tradeIndex = tradeIndexRaw === null || isNaN(tradeIndexRaw) ? null : Math.trunc(tradeIndexRaw);
+
+  const explicitMarket = pairRecord && typeof pairRecord.from === "string" && typeof pairRecord.to === "string"
+    ? `${pairRecord.from}/${pairRecord.to}`
+    : null;
 
   const marketFromPosition =
+    explicitMarket ||
     readString(candidates, ["market", "symbol", "pair", "pairName", "asset", "assetName"]) ||
     (pairId !== null ? marketLookup.get(pairId) || null : null);
 
   const sideToken = readString(candidates, ["side", "direction", "positionSide"]);
-  const sideBool = readBoolean(candidates, ["isLong", "long", "direction"]);
+  const sideBool = readBoolean(candidates, ["isLong", "long", "direction", "isBuy"]);
 
   let side: ParsedOstiumPosition["side"] = "UNKNOWN";
   if (sideToken) {
@@ -287,12 +295,52 @@ export function parsePosition(
   const collateralRaw = readUnknown(candidates, ["collateral", "collateralAmount", "positionSizeUsdc", "margin"]);
   const leverageRaw = readUnknown(candidates, ["leverage", "positionLeverage", "lev"]);
   const entryPriceRaw = readUnknown(candidates, ["openPrice", "entryPrice", "price", "entry_price"]);
-  const pnlRaw = readUnknown(candidates, ["pnl", "pnlUsd", "profitLoss", "unrealizedPnl", "currentPnl"]);
+  const pnlRaw = readUnknown(candidates, ["pnl", "pnlUsd", "profitLoss", "unrealizedPnl", "currentPnl", "funding"]);
   const slRaw = readUnknown(candidates, ["slPrice", "stopLossPrice", "stopLoss", "sl"]);
   const tpRaw = readUnknown(candidates, ["tpPrice", "takeProfitPrice", "takeProfit", "tp"]);
 
-  const explicitId = readString(candidates, ["id", "positionId", "tradeId", "uid"]);
+  const explicitId = readString(candidates, ["id", "tradeID", "positionId", "tradeId", "uid"]);
   const id = explicitId || `${pairId ?? "pair"}-${tradeIndex ?? "idx"}-${index}`;
+
+  let finalLeverage = formatNumber(leverageRaw as string | number | null, 2);
+  let finalCollateral = formatNumber(collateralRaw as string | number | null, 4);
+
+  // Quick heuristic: If leverage is passed as 5000, Ostium usually means 50.00x
+  if (typeof leverageRaw === "string" && Number(leverageRaw) > 1000) {
+    finalLeverage = formatNumber(Number(leverageRaw) / 100, 2) + "x";
+  } else if (finalLeverage !== "-") {
+    finalLeverage = finalLeverage + "x";
+  }
+
+  // Quick heuristic for collateral if scaled by 1e6
+  if (typeof collateralRaw === "string" && collateralRaw.length > 5 && !collateralRaw.includes(".")) {
+    finalCollateral = formatNumber(Number(collateralRaw) / 1e6, 2) + " USDC";
+  } else if (finalCollateral !== "-") {
+    finalCollateral = finalCollateral + " USDC";
+  }
+
+  // Quick heuristic for entryPrice if scaled by 1e18
+  let finalPrice = formatNumber(entryPriceRaw as string | number | null, 6);
+  if (typeof entryPriceRaw === "string" && entryPriceRaw.length > 15 && !entryPriceRaw.includes(".")) {
+    finalPrice = formatNumber(Number(entryPriceRaw) / 1e18, 4);
+  }
+
+  // Quick heuristic for PnL/funding if scaled by 1e18
+  let finalPnl = formatNumber(pnlRaw as string | number | null, 6);
+  if (typeof pnlRaw === "string" && pnlRaw.replace("-", "").length > 14 && !pnlRaw.includes(".")) {
+    finalPnl = formatNumber(Number(pnlRaw) / 1e18, 4);
+  }
+
+  // Quick heuristic for SL/TP if scaled by 1e10 (Ostium on-chain price precision)
+  let finalSl = formatNumber(slRaw as string | number | null, 6);
+  if (typeof slRaw === "string" && slRaw.replace("-", "").length > 9 && !slRaw.includes(".")) {
+    finalSl = formatNumber(Number(slRaw) / 1e10, 4);
+  }
+
+  let finalTp = formatNumber(tpRaw as string | number | null, 6);
+  if (typeof tpRaw === "string" && tpRaw.replace("-", "").length > 9 && !tpRaw.includes(".")) {
+    finalTp = formatNumber(Number(tpRaw) / 1e10, 4);
+  }
 
   return {
     id,
@@ -300,12 +348,12 @@ export function parsePosition(
     tradeIndex,
     marketLabel: marketFromPosition || (pairId !== null ? `Pair #${pairId}` : "Unknown market"),
     side,
-    collateral: formatNumber(collateralRaw as string | number | null, 4),
-    leverage: formatNumber(leverageRaw as string | number | null, 2),
-    entryPrice: formatNumber(entryPriceRaw as string | number | null, 6),
-    pnl: formatNumber(pnlRaw as string | number | null, 6),
-    currentSl: formatNumber(slRaw as string | number | null, 6),
-    currentTp: formatNumber(tpRaw as string | number | null, 6),
+    collateral: finalCollateral,
+    leverage: finalLeverage,
+    entryPrice: finalPrice,
+    pnl: finalPnl,
+    currentSl: finalSl,
+    currentTp: finalTp,
     raw: record,
   };
 }

@@ -25,7 +25,6 @@ import {
   type OstiumAction,
   type OstiumNetwork,
   type OstiumSetupOverview,
-  type ParsedOstiumPosition,
   parsePosition,
 } from "@/types/ostium";
 import { getChain } from "@/web3/config/chain-registry";
@@ -537,7 +536,7 @@ function OstiumNodeConfigurationInner({
                   value={market}
                   onChange={(e) => handleDataChange({ market: e.target.value })}
                   options={marketOptions}
-                  placeholder="Select market to trade"
+                  placeholder="Select asset to trade"
                 />
               ) : (
                 <Input
@@ -581,7 +580,7 @@ function OstiumNodeConfigurationInner({
 
             <div className="space-y-1.5">
               <Typography variant="caption" className="text-muted-foreground font-medium">
-                Collateral Amount
+                Amount
               </Typography>
               <div className="relative">
                 <Input
@@ -603,7 +602,7 @@ function OstiumNodeConfigurationInner({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Typography variant="caption" className="text-muted-foreground font-medium">
-                  Base Asset
+                  Asset
                 </Typography>
                 <Input
                   value={base}
@@ -613,7 +612,7 @@ function OstiumNodeConfigurationInner({
               </div>
               <div className="space-y-1.5">
                 <Typography variant="caption" className="text-muted-foreground font-medium">
-                  Quote Currency
+                  Currency
                 </Typography>
                 <Input
                   value={quote}
@@ -627,7 +626,7 @@ function OstiumNodeConfigurationInner({
 
         {(action === "CLOSE_POSITION" || action === "UPDATE_SL" || action === "UPDATE_TP") && (
           <div className="rounded-xl border border-white/15 bg-black/20 p-3.5 space-y-4 shadow-sm">
-            <div className="space-y-3 pb-3 border-b border-white/10">
+            <div className="space-y-3 pb-3">
               <div className="flex items-center justify-between">
                 <Typography variant="caption" className="text-muted-foreground font-medium">
                   Active Position
@@ -658,11 +657,11 @@ function OstiumNodeConfigurationInner({
                     });
                   }}
                   options={positionOptions}
-                  placeholder="Select open position"
+                  placeholder="Select active position"
                 />
               ) : (
                 <div className="text-sm text-muted-foreground/80 py-2">
-                  No open positions found.
+                  No active positions found.
                 </div>
               )}
             </div>
