@@ -27,8 +27,6 @@ export const ostiumBlock: BlockDefinition = {
     market: "",
     base: "",
     quote: "USD",
-    address: "",
-    traderAddress: "",
     side: "long",
     collateral: "",
     leverage: "",
@@ -37,8 +35,6 @@ export const ostiumBlock: BlockDefinition = {
     slPrice: "",
     tpPrice: "",
     idempotencyKey: "",
-    delegationStatus: "UNKNOWN",
-    delegationCheckedAt: "",
   },
 };
 

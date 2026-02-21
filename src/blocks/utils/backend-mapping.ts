@@ -189,8 +189,6 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
       const market = toOptionalString(data.market);
       const base = toOptionalString(data.base);
       const quote = toOptionalString(data.quote);
-      const address = toOptionalString(data.address);
-      const traderAddress = toOptionalString(data.traderAddress);
       const side = toOptionalString(data.side);
       const idempotencyKey = toOptionalString(data.idempotencyKey);
 
@@ -204,8 +202,6 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
       if (market) config.market = market;
       if (base) config.base = base;
       if (quote) config.quote = quote;
-      if (address) config.address = address;
-      if (traderAddress) config.traderAddress = traderAddress;
       if (side) config.side = side;
       if (idempotencyKey) config.idempotencyKey = idempotencyKey;
 
