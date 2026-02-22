@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import LogoOnlyHeader from "@/components/layout/LogoOnlyHeader";
+import NavBar from "@/components/layout/Navbar";
 import AgentOnboardingPageClient from "@/components/onboarding/AgentOnboardingPageClient";
 import { WorkflowProvider } from "@/context/WorkflowContext";
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function AgentOnboardingPage() {
   return (
     <div className="bg-background">
-      <LogoOnlyHeader />
+      <NavBar variant="onboarding" />
       <main className="w-[90%] mx-auto mt-40">
         <WorkflowProvider>
           <AgentOnboardingPageClient />
