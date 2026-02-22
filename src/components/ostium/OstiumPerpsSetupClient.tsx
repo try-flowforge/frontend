@@ -21,6 +21,7 @@ import { postOstiumAuthed } from "@/lib/ostium-api";
 import { emitOstiumTelemetry } from "@/lib/ostium-telemetry";
 import { getChain } from "@/web3/config/chain-registry";
 import {
+  formatNumber,
   type OstiumNetwork,
   type OstiumSetupOverview,
   type ParsedOstiumPosition,
@@ -59,9 +60,19 @@ interface PositionDraft {
 
 type PositionActionType = "close" | "sl" | "tp";
 
+function normalizePriceDraftValue(value: string | undefined): string {
+  if (!value) return "";
+  const numeric = Number(value.replace(/,/g, "").trim());
+  if (!Number.isFinite(numeric)) return value;
+  if (Math.abs(numeric) >= 1e9) {
+    return formatNumber(numeric / 1e10, 4);
+  }
+  return value;
+}
+
 export default function OstiumPerpsSetupClient() {
   const { authenticated, login } = usePrivy();
-  const { getPrivyAccessToken, ethereumProvider, chainId, walletAddress } = usePrivyWallet();
+  const { getPrivyAccessToken, ethereumProvider, chainId } = usePrivyWallet();
 
   const chain = getChain(chainId);
   const derivedNetwork: OstiumNetwork = chain?.id === "ARBITRUM" ? "mainnet" : "testnet";
@@ -488,7 +499,7 @@ export default function OstiumPerpsSetupClient() {
 
       const draft = positionDrafts[position.id];
       const valueRaw = type === "sl" ? draft?.slPrice : draft?.tpPrice;
-      const numericValue = Number(valueRaw);
+      const numericValue = Number(String(valueRaw ?? "").replace(/,/g, "").trim());
 
       if (!valueRaw || !Number.isFinite(numericValue) || numericValue <= 0) {
         setActionMessage({
@@ -584,13 +595,16 @@ export default function OstiumPerpsSetupClient() {
       const next: Record<string, PositionDraft> = {};
 
       for (const position of parsedPositions) {
+        const slSeed =
+          prev[position.id]?.slPrice ??
+          (position.currentSl !== "-" ? position.currentSl : "");
+        const tpSeed =
+          prev[position.id]?.tpPrice ??
+          (position.currentTp !== "-" ? position.currentTp : "");
+
         next[position.id] = {
-          slPrice:
-            prev[position.id]?.slPrice ??
-            (position.currentSl !== "-" ? position.currentSl : ""),
-          tpPrice:
-            prev[position.id]?.tpPrice ??
-            (position.currentTp !== "-" ? position.currentTp : ""),
+          slPrice: normalizePriceDraftValue(slSeed),
+          tpPrice: normalizePriceDraftValue(tpSeed),
         };
       }
 
@@ -740,7 +754,7 @@ export default function OstiumPerpsSetupClient() {
           delegationActionLoading={delegationActionLoading}
           allowanceActionLoading={allowanceActionLoading}
           needsAllowance={needsAllowance}
-          ethereumProvider={ethereumProvider as any}
+          ethereumProvider={ethereumProvider}
           runDelegationFlow={runDelegationFlow}
           runAllowanceFlow={runAllowanceFlow}
         />

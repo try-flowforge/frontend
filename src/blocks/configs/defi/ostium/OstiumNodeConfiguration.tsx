@@ -50,6 +50,17 @@ function toTrimmedString(value: unknown): string {
   return "";
 }
 
+function normalizePriceInputValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  const numeric = Number(trimmed.replace(/,/g, ""));
+  if (!Number.isFinite(numeric)) return value;
+  if (Math.abs(numeric) >= 1e9) {
+    return (numeric / 1e10).toFixed(4).replace(/\.?0+$/, "");
+  }
+  return value;
+}
+
 function toNetwork(value: unknown): OstiumNetwork {
   return value === "mainnet" ? "mainnet" : "testnet";
 }
@@ -98,6 +109,8 @@ function OstiumNodeConfigurationInner({
   const tradeIndex = toTrimmedString(nodeData.tradeIndex);
   const slPrice = toTrimmedString(nodeData.slPrice);
   const tpPrice = toTrimmedString(nodeData.tpPrice);
+  const normalizedSlPrice = normalizePriceInputValue(slPrice);
+  const normalizedTpPrice = normalizePriceInputValue(tpPrice);
 
   const [marketsState, setMarketsState] = useState<{
     loading: boolean;
@@ -344,6 +357,19 @@ function OstiumNodeConfigurationInner({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [derivedNetwork]);
+
+  useEffect(() => {
+    const updates: Record<string, unknown> = {};
+    if (slPrice && normalizedSlPrice !== slPrice) {
+      updates.slPrice = normalizedSlPrice;
+    }
+    if (tpPrice && normalizedTpPrice !== tpPrice) {
+      updates.tpPrice = normalizedTpPrice;
+    }
+    if (Object.keys(updates).length > 0) {
+      handleDataChange(updates);
+    }
+  }, [handleDataChange, normalizedSlPrice, normalizedTpPrice, slPrice, tpPrice]);
 
   useEffect(() => {
     if (!authenticated) return;
@@ -651,9 +677,14 @@ function OstiumNodeConfigurationInner({
                   value={selectedPositionId}
                   onChange={(e) => {
                     const [pId, tIndex] = e.target.value.split("-");
+                    const selected = parsedPositions.find(
+                      (pos) => `${pos.pairId}-${pos.tradeIndex}` === e.target.value,
+                    );
                     handleDataChange({
                       pairId: pId,
                       tradeIndex: tIndex,
+                      ...(selected?.currentSl && selected.currentSl !== "-" ? { slPrice: selected.currentSl } : {}),
+                      ...(selected?.currentTp && selected.currentTp !== "-" ? { tpPrice: selected.currentTp } : {}),
                     });
                   }}
                   options={positionOptions}
@@ -674,7 +705,7 @@ function OstiumNodeConfigurationInner({
                 <div className="relative">
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">$</span>
                   <Input
-                    value={slPrice}
+                    value={normalizedSlPrice}
                     onChange={(e) => handleDataChange({ slPrice: e.target.value })}
                     placeholder="Price trigger"
                     className="pl-6"
@@ -691,7 +722,7 @@ function OstiumNodeConfigurationInner({
                 <div className="relative">
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">$</span>
                   <Input
-                    value={tpPrice}
+                    value={normalizedTpPrice}
                     onChange={(e) => handleDataChange({ tpPrice: e.target.value })}
                     placeholder="Price target"
                     className="pl-6"

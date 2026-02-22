@@ -4,54 +4,12 @@ import { useEffect, useMemo } from "react";
 import {
     LuShield,
     LuShieldAlert,
-    LuShieldCheck,
     LuCircleCheck,
     LuLoader,
     LuX,
 } from "react-icons/lu";
 import { Typography } from "@/components/ui/Typography";
 import type { OstiumSetupOverview } from "@/types/ostium";
-import type { EIP1193Provider } from "@privy-io/react-auth";
-
-function getDelegationStatusVisual(status: string | null): {
-    label: string;
-    className: string;
-    icon: React.ReactNode;
-} {
-    if (status === "ACTIVE") {
-        return {
-            label: "Active",
-            className: "text-green-400 bg-green-500/10 border-green-500/30",
-            icon: <LuShieldCheck className="w-4 h-4" />,
-        };
-    }
-    if (status === "PENDING") {
-        return {
-            label: "Pending",
-            className: "text-amber-400 bg-amber-500/10 border-amber-500/30",
-            icon: <LuShield className="w-4 h-4" />,
-        };
-    }
-    if (status === "REVOKED") {
-        return {
-            label: "Revoked",
-            className: "text-zinc-300 bg-zinc-500/10 border-zinc-500/30",
-            icon: <LuShieldAlert className="w-4 h-4" />,
-        };
-    }
-    if (status === "FAILED") {
-        return {
-            label: "Failed",
-            className: "text-red-400 bg-red-500/10 border-red-500/30",
-            icon: <LuShieldAlert className="w-4 h-4" />,
-        };
-    }
-    return {
-        label: "Unknown",
-        className: "text-zinc-300 bg-white/5 border-white/10",
-        icon: <LuShield className="w-4 h-4" />,
-    };
-}
 
 function getCheckVisual(ok: boolean): { className: string; label: string; icon: React.ReactNode } {
     if (ok) {
@@ -76,7 +34,11 @@ export interface OstiumSetupModalProps {
     delegationActionLoading: "approve" | "revoke" | null;
     allowanceActionLoading: boolean;
     needsAllowance: boolean;
-    ethereumProvider: EIP1193Provider | null;
+    ethereumProvider: {
+        request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+        on?: (event: string, handler: (...args: unknown[]) => void) => void;
+        removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+    } | null;
     runDelegationFlow: (type: "approve" | "revoke") => Promise<void>;
     runAllowanceFlow: () => Promise<void>;
 }

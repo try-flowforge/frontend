@@ -237,6 +237,85 @@ export function formatAddress(address: string | null | undefined): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+function toNumeric(value: unknown): number | null {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/,/g, "").trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function formatScaledValue(
+  value: unknown,
+  options: {
+    scale: number;
+    threshold: number;
+    scaledDigits: number;
+    defaultDigits: number;
+  },
+): string {
+  const numeric = toNumeric(value);
+  if (numeric === null) {
+    return formatNumber(value as string | number | null | undefined, options.defaultDigits);
+  }
+
+  if (Math.abs(numeric) >= options.threshold) {
+    return formatNumber(numeric / options.scale, options.scaledDigits);
+  }
+
+  return formatNumber(numeric, options.defaultDigits);
+}
+
+function normalizePriceLevel(value: unknown, entryReference: number | null): string {
+  const numeric = toNumeric(value);
+  if (numeric === null) {
+    return formatNumber(value as string | number | null | undefined, 6);
+  }
+
+  // Try multiple fixed-point variants observed across payloads.
+  const scaleCandidates = [1e-18, 1e-14, 1e-12, 1e-10, 1e-9, 1e-8, 1e-6, 1e-4, 1e-2, 1, 1e2, 1e4];
+
+  const candidates = scaleCandidates
+    .map((scale) => numeric * scale)
+    .filter((candidate) => Number.isFinite(candidate) && candidate > 0);
+
+  if (!candidates.length) {
+    return formatNumber(numeric, 6);
+  }
+
+  let best = candidates[0];
+
+  if (entryReference && Number.isFinite(entryReference) && entryReference > 0) {
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (const candidate of candidates) {
+      const ratio = candidate / entryReference;
+      if (!Number.isFinite(ratio) || ratio <= 0) {
+        continue;
+      }
+
+      const logDistance = Math.abs(Math.log10(ratio));
+      const rangePenalty = ratio < 0.05 || ratio > 20 ? 2 : 0;
+      const score = logDistance + rangePenalty;
+
+      if (score < bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+  } else {
+    // Fallback when entry price is unavailable.
+    best = Math.abs(numeric) >= 1e9 ? numeric / 1e10 : numeric;
+  }
+
+  return formatNumber(best, 4);
+}
+
 export function parsePosition(
   value: unknown,
   index: number,
@@ -305,42 +384,42 @@ export function parsePosition(
   let finalLeverage = formatNumber(leverageRaw as string | number | null, 2);
   let finalCollateral = formatNumber(collateralRaw as string | number | null, 4);
 
-  // Quick heuristic: If leverage is passed as 5000, Ostium usually means 50.00x
-  if (typeof leverageRaw === "string" && Number(leverageRaw) > 1000) {
-    finalLeverage = formatNumber(Number(leverageRaw) / 100, 2) + "x";
+  // Ostium can return leverage as 5000 => 50.00x.
+  const leverageNumeric = toNumeric(leverageRaw);
+  if (leverageNumeric !== null) {
+    const normalizedLeverage = Math.abs(leverageNumeric) > 1000 ? leverageNumeric / 100 : leverageNumeric;
+    finalLeverage = `${formatNumber(normalizedLeverage, 2)}x`;
   } else if (finalLeverage !== "-") {
-    finalLeverage = finalLeverage + "x";
+    finalLeverage = `${finalLeverage}x`;
   }
 
-  // Quick heuristic for collateral if scaled by 1e6
-  if (typeof collateralRaw === "string" && collateralRaw.length > 5 && !collateralRaw.includes(".")) {
-    finalCollateral = formatNumber(Number(collateralRaw) / 1e6, 2) + " USDC";
+  // Collateral can be returned in 1e6 fixed point (e.g. 100 USDC => 100000000).
+  const collateralNumeric = toNumeric(collateralRaw);
+  if (collateralNumeric !== null) {
+    const normalizedCollateral = Math.abs(collateralNumeric) >= 1e7 ? collateralNumeric / 1e6 : collateralNumeric;
+    finalCollateral = `${formatNumber(normalizedCollateral, 2)} USDC`;
   } else if (finalCollateral !== "-") {
-    finalCollateral = finalCollateral + " USDC";
+    finalCollateral = `${finalCollateral} USDC`;
   }
 
-  // Quick heuristic for entryPrice if scaled by 1e18
-  let finalPrice = formatNumber(entryPriceRaw as string | number | null, 6);
-  if (typeof entryPriceRaw === "string" && entryPriceRaw.length > 15 && !entryPriceRaw.includes(".")) {
-    finalPrice = formatNumber(Number(entryPriceRaw) / 1e18, 4);
-  }
+  // Prices from Ostium often come back in fixed-point precision.
+  const finalPrice = formatScaledValue(entryPriceRaw, {
+    scale: 1e18,
+    threshold: 1e15,
+    scaledDigits: 4,
+    defaultDigits: 6,
+  });
 
-  // Quick heuristic for PnL/funding if scaled by 1e18
-  let finalPnl = formatNumber(pnlRaw as string | number | null, 6);
-  if (typeof pnlRaw === "string" && pnlRaw.replace("-", "").length > 14 && !pnlRaw.includes(".")) {
-    finalPnl = formatNumber(Number(pnlRaw) / 1e18, 4);
-  }
+  const finalPnl = formatScaledValue(pnlRaw, {
+    scale: 1e18,
+    threshold: 1e14,
+    scaledDigits: 4,
+    defaultDigits: 6,
+  });
 
-  // Quick heuristic for SL/TP if scaled by 1e10 (Ostium on-chain price precision)
-  let finalSl = formatNumber(slRaw as string | number | null, 6);
-  if (typeof slRaw === "string" && slRaw.replace("-", "").length > 9 && !slRaw.includes(".")) {
-    finalSl = formatNumber(Number(slRaw) / 1e10, 4);
-  }
-
-  let finalTp = formatNumber(tpRaw as string | number | null, 6);
-  if (typeof tpRaw === "string" && tpRaw.replace("-", "").length > 9 && !tpRaw.includes(".")) {
-    finalTp = formatNumber(Number(tpRaw) / 1e10, 4);
-  }
+  const entryPriceNumeric = toNumeric(finalPrice);
+  const finalSl = normalizePriceLevel(slRaw, entryPriceNumeric);
+  const finalTp = normalizePriceLevel(tpRaw, entryPriceNumeric);
 
   return {
     id,
