@@ -64,9 +64,9 @@ export const OnboardingWizard: React.FC = () => {
 
     const steps = useMemo(
         () => [
-            { id: "wallet", label: "Wallet Choice" },
-            { id: "chain", label: "Network Selection" },
-            { id: "setup", label: "Safe Wallet Set-up" },
+            { id: "wallet" as const, label: "Wallet Choice" },
+            { id: "chain" as const, label: "Network Selection" },
+            { id: "setup" as const, label: "Safe Wallet Set-up" },
         ],
         []
     );
