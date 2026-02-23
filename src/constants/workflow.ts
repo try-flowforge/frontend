@@ -26,8 +26,8 @@ export const TAG_MAPPINGS = {
     uniswap: ['uniswap'],
     aave: ['aave'],
     compound: ['compound'],
-    oneinch: ['1inch'],
-    relay: ['relay'],
+    uniswapV4: ['uniswap V4'],
+    lifi: ['lifi'],
 
     // Communication & Notifications
     email: ['email'],

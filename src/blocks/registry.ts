@@ -14,9 +14,7 @@ import { switchBlock } from "./definitions/control/switch";
 import { aaveBlock } from "./definitions/defi/aave";
 import { compoundBlock } from "./definitions/defi/compound";
 import { lifiBlock } from "./definitions/defi/lifi";
-import { oneInchBlock } from "./definitions/defi/oneinch";
 import { ostiumBlock } from "./definitions/defi/ostium";
-import { relayBlock } from "./definitions/defi/relay";
 import { uniswapBlock } from "./definitions/defi/uniswap";
 import { chainlinkBlock } from "./definitions/oracle/chainlink";
 import { pythBlock } from "./definitions/oracle/pyth";
@@ -140,8 +138,6 @@ const STATIC_BLOCKS: BlockDefinition[] = [
   apiBlock,
   // DeFi blocks
   uniswapBlock,
-  relayBlock,
-  oneInchBlock,
   lifiBlock,
   ostiumBlock,
   aaveBlock,
@@ -371,8 +367,6 @@ export function generateIconRegistry(): IconRegistry {
     IfElseLogo: logos.IfElseLogo,
     SwitchLogo: logos.SwitchLogo,
     UniswapLogo: logos.UniswapLogo,
-    RelayLogo: logos.RelayLogo,
-    OneInchLogo: logos.OneInchLogo,
     LiFiLogo: logos.LiFiLogo,
     AaveLogo: logos.AaveLogo,
     CompoundLogo: logos.CompoundLogo,

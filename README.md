@@ -35,8 +35,7 @@ Create `.env.local` with:
 | -------- | ----------- |
 | `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL (no trailing slash), e.g. `http://localhost:3000/api/v1` |
 | `NEXT_PUBLIC_PRIVY_APP_ID` | Privy app ID for embedded wallet auth |
-| `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_11155111` | Safe factory (Ethereum Sepolia) |
-| `NEXT_PUBLIC_SAFE_MODULE_ADDRESS_11155111` | Safe module (Ethereum Sepolia) |
+
 | `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_421614` | Safe factory (Arbitrum Sepolia) |
 | `NEXT_PUBLIC_SAFE_MODULE_ADDRESS_421614` | Safe module (Arbitrum Sepolia) |
 | `NEXT_PUBLIC_SAFE_WALLET_FACTORY_ADDRESS_42161` | Safe factory (Arbitrum Mainnet) |

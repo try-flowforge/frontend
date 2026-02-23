@@ -71,12 +71,10 @@ export function extractNodeConfig(node: Node): Record<string, unknown> {
       };
 
     case "uniswap":
-    case "relay":
-    case "oneinch":
     case "lifi":
       return {
-        // Ensure provider is always persisted; LI.FI blocks should never fall back to UNISWAP.
-        provider: data.swapProvider || (type === "lifi" ? "LIFI" : undefined),
+        // Ensure provider is always persisted; LI.FI blocks should never fall back to UNISWAP_V4.
+        provider: data.swapProvider || (type === "lifi" ? "LIFI" : "UNISWAP_V4"),
         chain: data.swapChain,
         ...(data.swapToChain != null && data.swapToChain !== "" && { toChain: data.swapToChain }),
         inputConfig: {

@@ -27,14 +27,12 @@ import lido from "@/assets/blocks/Lido.svg";
 import lifi from "@/assets/blocks/LiFi.svg";
 import mail from "@/assets/blocks/Mail.svg";
 import nexusmutual from "@/assets/blocks/NexusMutual.svg";
-import oneinch from "@/assets/blocks/OneInch.svg";
 import opensea from "@/assets/blocks/OpenSea.svg";
 import ostium from "@/assets/blocks/Ostium.svg";
 import pendle from "@/assets/blocks/Pendle.svg";
 import pyth from "@/assets/blocks/Pyth.svg";
 import qwen from "@/assets/blocks/Qwen.svg";
 import radiant from "@/assets/blocks/Radiant.svg";
-import relay from "@/assets/blocks/Relay.svg";
 import slack from "@/assets/blocks/Slack.svg";
 import snapshot from "@/assets/blocks/Snapshot.svg";
 import stargate from "@/assets/blocks/Stargate.svg";
@@ -54,7 +52,6 @@ const currentProtocols = [
   { name: "Slack", icon: slack },
   { name: "Uniswap", icon: uniswap },
   { name: "LiFi", icon: lifi },
-  { name: "1inch", icon: oneinch },
   { name: "Aave", icon: aave },
   { name: "Compound", icon: compound },
   { name: "Wallet", icon: wallet },
@@ -66,7 +63,6 @@ const currentProtocols = [
   { name: "Qwen", icon: qwen },
   { name: "If/Else", icon: ifElse },
   { name: "Switch", icon: switchIcon },
-  { name: "Relay", icon: relay },
 ];
 
 // Future integrations

@@ -87,9 +87,9 @@ export interface AiTransformNodeData extends BaseNodeData {
     maxOutputTokens?: number;
 }
 
-// Swap Node Data (for Uniswap, Relay, 1inch, LIFI blocks)
+// Swap Node Data (for Uniswap, LIFI blocks)
 export interface SwapNodeData extends BaseNodeData {
-    swapProvider?: "UNISWAP" | "UNISWAP_V4" | "RELAY" | "ONEINCH" | "LIFI";
+    swapProvider?: "UNISWAP_V4" | "LIFI";
     swapChain?: string;
     /** Destination chain for cross-chain swaps (LiFi). When set and different from swapChain, use cross-chain route. */
     swapToChain?: string;
@@ -205,8 +205,6 @@ export type WorkflowNodeData =
     | ({ nodeType: "wallet-node" } & WalletNodeData)
     | ({ nodeType: "start" } & StartNodeData)
     | ({ nodeType: "uniswap" } & SwapNodeData)
-    | ({ nodeType: "relay" } & SwapNodeData)
-    | ({ nodeType: "oneinch" } & SwapNodeData)
     | ({ nodeType: "aave" } & LendingNodeData)
     | ({ nodeType: "compound" } & LendingNodeData)
     | ({ nodeType: "chainlink" } & OracleNodeData)

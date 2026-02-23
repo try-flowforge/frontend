@@ -91,10 +91,7 @@ export const API_CONFIG = {
       FEEDS: "/oracle/feeds",
       CONFIG: "/oracle/config",
     },
-    ENS: {
-      SUBDOMAIN_REGISTERED: "/ens/subdomain-registered",
-      SUBDOMAINS: "/ens/subdomains",
-    },
+
   },
 
   // OAuth polling configuration

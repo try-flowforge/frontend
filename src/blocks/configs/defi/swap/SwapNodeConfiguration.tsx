@@ -111,7 +111,7 @@ function encodeFunctionData(funcName: 'allowance' | 'approve' | 'balanceOf', arg
  * 
  * Allows users to configure token swaps with:
  * - Network from user menu (read-only, automatically synced)
- * - Provider selection (Uniswap, 1inch, Relay - set by block type)
+ * - Provider selection (Uniswap, LiFi - set by block type)
  * - Token pair selection (source and destination)
  * - Amount input with token decimals handling
  * - Swap type locked to EXACT_INPUT
@@ -139,7 +139,7 @@ export function SwapNodeConfiguration({
     const swapProvider =
         forcedProvider ||
         (nodeData.swapProvider as SwapProvider) ||
-        SwapProvider.UNISWAP;
+        SwapProvider.UNISWAP_V4;
 
     // Convert chainId to chain string
     const getChainFromChainId = useCallback((cid: number | null | string): string => {
