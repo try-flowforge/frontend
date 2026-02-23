@@ -42,6 +42,7 @@ export const API_CONFIG = {
       BUILD_TRANSACTION: "/swaps/build-transaction",
       BUILD_SAFE_TRANSACTION: "/swaps/build-safe-transaction",
       EXECUTE_WITH_SIGNATURE: "/swaps/execute-with-signature",
+      REPORT_CLIENT_TX: "/swaps/report-client-tx",
       PROVIDERS: "/swaps/providers",
       EXECUTIONS: "/swaps/executions",
     },
@@ -80,6 +81,7 @@ export const API_CONFIG = {
     },
     RELAY: {
       CREATE_SAFE: "/relay/create-safe",
+      SYNC_SAFE_FROM_TX: "/relay/sync-safe-from-tx",
       ENABLE_MODULE: "/relay/enable-module",
     },
     META: {

@@ -183,13 +183,6 @@ export function UserMenu() {
                 )}
               </div>
 
-              {/* Sponsored txs (mainnet) */}
-              {typeof profile?.remaining_sponsored_txs === 'number' && (
-                <div className="w-full px-3 py-2 rounded-lg bg-white/10 text-sm text-white/80">
-                  <span className="text-white/50">Sponsored txs (mainnet): </span>
-                  <span className="font-medium">{profile.remaining_sponsored_txs}</span>
-                </div>
-              )}
             </div>
           </div>
 

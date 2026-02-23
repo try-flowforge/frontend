@@ -124,7 +124,29 @@ export function TransactionSigner({ intentId }: { intentId: string }) {
                 throw new Error(completeData.error || "Failed to complete transaction on the server.");
             }
 
-            setIntent(prev => prev ? { ...prev, ...completeData.data } : null);
+            // Mainnet: backend returned payload for client submission (user pays gas)
+            if (completeData.data?.submitOnClient && completeData.data?.payload && ethereumProvider) {
+                const { payload } = completeData.data;
+                try {
+                    await ethereumProvider.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+                    });
+                } catch (e) {
+                    console.warn('Chain switch failed', e);
+                }
+                const txHash = (await ethereumProvider.request({
+                    method: 'eth_sendTransaction',
+                    params: [{
+                        to: payload.to,
+                        data: payload.data,
+                        value: payload.value || '0x0',
+                    }],
+                })) as string;
+                setIntent(prev => prev ? { ...prev, txHash: txHash || undefined, ...completeData.data } : null);
+            } else {
+                setIntent(prev => prev ? { ...prev, ...completeData.data } : null);
+            }
             setSigningStep('done');
 
         } catch (err) {

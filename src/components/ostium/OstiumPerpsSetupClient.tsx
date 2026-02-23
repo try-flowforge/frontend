@@ -321,11 +321,32 @@ export default function OstiumPerpsSetupClient() {
         throw new Error("Failed to produce Safe signature.");
       }
 
-      await postOstiumAuthed(getPrivyAccessToken, executeEndpoint, {
-        network: derivedNetwork,
-        signature,
-        ...extraPayload,
-      });
+      const result = await postOstiumAuthed<{ submitOnClient?: boolean; payload?: { chainId: number; to: string; data: string; value: string }; txHash?: string }>(
+        getPrivyAccessToken,
+        executeEndpoint,
+        { network: derivedNetwork, signature, ...extraPayload },
+      );
+
+      // Mainnet: backend returned payload for client submission (user pays gas)
+      if (result?.submitOnClient && result?.payload && ethereumProvider) {
+        const { payload } = result;
+        try {
+          await ethereumProvider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+          });
+        } catch (e) {
+          console.warn("Chain switch failed", e);
+        }
+        await ethereumProvider.request({
+          method: "eth_sendTransaction",
+          params: [{
+            to: payload.to,
+            data: payload.data,
+            value: payload.value || "0x0",
+          }],
+        });
+      }
     },
     [derivedNetwork, ethereumProvider, getPrivyAccessToken],
   );

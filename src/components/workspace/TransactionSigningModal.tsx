@@ -80,9 +80,42 @@ export function TransactionSigningModal({
                 }
             );
 
+            const data = await res.json();
             if (!res.ok) {
-                const data = await res.json();
                 throw new Error(data.error || "Failed to submit signature");
+            }
+            // Mainnet: backend returned payload for client submission (user pays gas)
+            if (data?.data?.submitOnClient && data?.data?.payload && ethereumProvider) {
+                const { payload } = data.data;
+                try {
+                    await ethereumProvider.request({
+                        method: "wallet_switchEthereumChain",
+                        params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+                    });
+                } catch (e) {
+                    console.warn("Chain switch failed", e);
+                }
+                const txHash = (await ethereumProvider.request({
+                    method: "eth_sendTransaction",
+                    params: [{
+                        to: payload.to,
+                        data: payload.data,
+                        value: payload.value || "0x0",
+                    }],
+                })) as string;
+                if (txHash && data.data.executionId) {
+                    const token2 = await getPrivyAccessToken();
+                    if (token2) {
+                        await fetch(`${buildApiUrl("/executions")}/${data.data.executionId}/report-client-tx`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token2}`,
+                            },
+                            body: JSON.stringify({ txHash }),
+                        });
+                    }
+                }
             }
 
             setState("success");
