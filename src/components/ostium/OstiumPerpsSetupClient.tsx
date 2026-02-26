@@ -26,7 +26,14 @@ import {
   type OstiumSetupOverview,
   type ParsedOstiumPosition,
   parsePosition,
+  type OstiumOrder,
+  type OstiumHistoryItem,
+  type OpenPositionForm,
+  type PositionDraft,
 } from "@/types/ostium";
+import { OstiumOrdersList } from "./OstiumOrdersList";
+import { OstiumHistoryList } from "./OstiumHistoryList";
+import { OstiumMarketStats } from "./OstiumMarketStats";
 
 interface SafeTxData {
   to: string;
@@ -46,19 +53,10 @@ interface PositionsResponse {
   positions?: unknown[];
 }
 
-interface OpenPositionForm {
-  market: string;
-  side: "long" | "short";
-  collateral: string;
-  leverage: string;
-}
 
-interface PositionDraft {
-  slPrice: string;
-  tpPrice: string;
-}
 
 type PositionActionType = "close" | "sl" | "tp";
+type OstiumTab = "trading" | "orders" | "history" | "markets";
 
 function normalizePriceDraftValue(value: string | undefined): string {
   if (!value) return "";
@@ -87,6 +85,7 @@ export default function OstiumPerpsSetupClient() {
     data: null,
   });
 
+  const [activeTab, setActiveTab] = useState<OstiumTab>("trading");
   const [isSetupOpen, setIsSetupOpen] = useState(false);
 
   const [marketsState, setMarketsState] = useState<{
@@ -109,9 +108,40 @@ export default function OstiumPerpsSetupClient() {
     positions: [],
   });
 
+  const [ordersState, setOrdersState] = useState<{
+    loading: boolean;
+    error: string | null;
+    orders: OstiumOrder[];
+  }>({
+    loading: false,
+    error: null,
+    orders: [],
+  });
+
+  const [historyState, setHistoryState] = useState<{
+    loading: boolean;
+    error: string | null;
+    history: OstiumHistoryItem[];
+  }>({
+    loading: false,
+    error: null,
+    history: [],
+  });
+
+  const [marketStats, setMarketStats] = useState<{
+    loading: boolean;
+    fundingRate: string;
+    rolloverFee: string;
+  }>({
+    loading: false,
+    fundingRate: "-",
+    rolloverFee: "-",
+  });
+
   const [delegationActionLoading, setDelegationActionLoading] = useState<"approve" | "revoke" | null>(null);
   const [allowanceActionLoading, setAllowanceActionLoading] = useState(false);
   const [openPositionLoading, setOpenPositionLoading] = useState(false);
+  const [faucetLoading, setFaucetLoading] = useState(false);
   const [rowActionLoading, setRowActionLoading] = useState<{ id: string; type: PositionActionType } | null>(null);
 
   const [openPositionForm, setOpenPositionForm] = useState<OpenPositionForm>({
@@ -119,6 +149,10 @@ export default function OstiumPerpsSetupClient() {
     side: "long",
     collateral: "",
     leverage: "",
+    orderType: "market",
+    triggerPrice: "",
+    slPrice: "",
+    tpPrice: "",
   });
 
   const [positionDrafts, setPositionDrafts] = useState<Record<string, PositionDraft>>({});
@@ -276,11 +310,69 @@ export default function OstiumPerpsSetupClient() {
     [authenticated, derivedNetwork, getPrivyAccessToken],
   );
 
+  const refreshOrders = useCallback(async (force = false) => {
+    if (!authenticated) return;
+    setOrdersState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const data = await postOstiumAuthed<{ orders: OstiumOrder[] }>(
+        getPrivyAccessToken,
+        API_CONFIG.ENDPOINTS.OSTIUM.ORDERS,
+        { network: derivedNetwork }
+      );
+      setOrdersState({ loading: false, error: null, orders: data.orders || [] });
+    } catch (error) {
+      setOrdersState({ loading: false, error: error instanceof Error ? error.message : "Failed to load orders", orders: [] });
+    }
+  }, [authenticated, derivedNetwork, getPrivyAccessToken]);
+
+  const refreshHistory = useCallback(async (force = false) => {
+    if (!authenticated) return;
+    setHistoryState(prev => ({ ...prev, loading: true, error: null }));
+    try {
+      const data = await postOstiumAuthed<{ history: OstiumHistoryItem[] }>(
+        getPrivyAccessToken,
+        API_CONFIG.ENDPOINTS.OSTIUM.HISTORY,
+        { network: derivedNetwork, limit: 50 }
+      );
+      setHistoryState({ loading: false, error: null, history: data.history || [] });
+    } catch (error) {
+      setHistoryState({ loading: false, error: error instanceof Error ? error.message : "Failed to load history", history: [] });
+    }
+  }, [authenticated, derivedNetwork, getPrivyAccessToken]);
+
+  const refreshMarketDetails = useCallback(async () => {
+    if (!authenticated || !openPositionForm.market) return;
+    setMarketStats(prev => ({ ...prev, loading: true }));
+    try {
+      const pairId = marketsState.markets.find(m => m.symbol === openPositionForm.market)?.pairId;
+      if (pairId === undefined) return;
+
+      const [funding, rollover] = await Promise.all([
+        postOstiumAuthed<{ fundingRate: string }>(getPrivyAccessToken, API_CONFIG.ENDPOINTS.OSTIUM.MARKET_FUNDING, { network: derivedNetwork, pairId }),
+        postOstiumAuthed<{ rolloverFee: string }>(getPrivyAccessToken, API_CONFIG.ENDPOINTS.OSTIUM.MARKET_ROLLOVER, { network: derivedNetwork, pairId })
+      ]);
+
+      setMarketStats({
+        loading: false,
+        fundingRate: funding.fundingRate,
+        rolloverFee: rollover.rolloverFee
+      });
+    } catch (e) {
+      setMarketStats(prev => ({ ...prev, loading: false }));
+    }
+  }, [authenticated, derivedNetwork, getPrivyAccessToken, openPositionForm.market, marketsState.markets]);
+
   const refreshHub = useCallback(
     async (force = false) => {
-      await Promise.all([refreshOverview(force), refreshMarkets(force), refreshPositions(force)]);
+      await Promise.all([
+        refreshOverview(force),
+        refreshMarkets(force),
+        refreshPositions(force),
+        refreshOrders(force),
+        refreshHistory(force)
+      ]);
     },
-    [refreshMarkets, refreshOverview, refreshPositions],
+    [refreshMarkets, refreshOverview, refreshPositions, refreshOrders, refreshHistory],
   );
 
   const signAndExecuteSafeFlow = useCallback(
@@ -428,6 +520,9 @@ export default function OstiumPerpsSetupClient() {
   const runOpenPosition = useCallback(async () => {
     const collateralValue = Number(openPositionForm.collateral);
     const leverageValue = Number(openPositionForm.leverage);
+    const triggerPriceValue = openPositionForm.triggerPrice ? Number(openPositionForm.triggerPrice) : undefined;
+    const slPriceValue = openPositionForm.slPrice ? Number(openPositionForm.slPrice) : undefined;
+    const tpPriceValue = openPositionForm.tpPrice ? Number(openPositionForm.tpPrice) : undefined;
 
     if (!openPositionForm.market) {
       setActionMessage({ kind: "error", value: "Select a market before opening a position." });
@@ -441,6 +536,10 @@ export default function OstiumPerpsSetupClient() {
       setActionMessage({ kind: "error", value: "Leverage must be greater than 0." });
       return;
     }
+    if (openPositionForm.orderType !== "market" && (!triggerPriceValue || !Number.isFinite(triggerPriceValue))) {
+      setActionMessage({ kind: "error", value: "Trigger price is required for Limit/Stop orders." });
+      return;
+    }
 
     setOpenPositionLoading(true);
     setActionMessage(null);
@@ -452,14 +551,28 @@ export default function OstiumPerpsSetupClient() {
         side: openPositionForm.side,
         collateral: collateralValue,
         leverage: leverageValue,
+        orderType: openPositionForm.orderType,
+        triggerPrice: triggerPriceValue,
+        slPrice: slPriceValue,
+        tpPrice: tpPriceValue,
         idempotencyKey: `ostium-hub-${Date.now()}`,
       });
 
       await refreshHub(true);
       setActionMessage({
         kind: "success",
-        value: "Open position request submitted.",
+        value: openPositionForm.orderType === "market"
+          ? "Open position request submitted."
+          : `${openPositionForm.orderType.charAt(0).toUpperCase() + openPositionForm.orderType.slice(1)} order placed.`,
       });
+
+      setOpenPositionForm((prev) => ({
+        ...prev,
+        collateral: "",
+        triggerPrice: "",
+        slPrice: "",
+        tpPrice: "",
+      }));
     } catch (error) {
       setActionMessage({
         kind: "error",
@@ -470,12 +583,53 @@ export default function OstiumPerpsSetupClient() {
     }
   }, [derivedNetwork, getPrivyAccessToken, openPositionForm, refreshHub]);
 
+  const runCancelOrder = useCallback(async (orderId: string) => {
+    setActionMessage(null);
+    try {
+      await postOstiumAuthed(getPrivyAccessToken, API_CONFIG.ENDPOINTS.OSTIUM.ORDER_CANCEL, {
+        network: derivedNetwork,
+        orderId
+      });
+      await refreshOrders(true);
+      setActionMessage({ kind: "success", value: "Order cancellation submitted." });
+    } catch (error) {
+      setActionMessage({ kind: "error", value: error instanceof Error ? error.message : "Failed to cancel order" });
+    }
+  }, [derivedNetwork, getPrivyAccessToken, refreshOrders]);
+
+  const runFaucet = useCallback(async () => {
+    setFaucetLoading(true);
+    setActionMessage(null);
+    try {
+      await postOstiumAuthed(getPrivyAccessToken, API_CONFIG.ENDPOINTS.OSTIUM.FAUCET, {
+        network: derivedNetwork
+      });
+      setActionMessage({ kind: "success", value: "1000 USDC requested from faucet." });
+      await refreshHub(true);
+    } catch (error) {
+      setActionMessage({ kind: "error", value: error instanceof Error ? error.message : "Faucet request failed" });
+    } finally {
+      setFaucetLoading(false);
+    }
+  }, [derivedNetwork, getPrivyAccessToken, refreshHub]);
+
   const runClosePosition = useCallback(
     async (position: ParsedOstiumPosition) => {
       if (position.pairId === null || position.tradeIndex === null) {
         setActionMessage({
           kind: "error",
           value: "This position does not expose pairId/tradeIndex. Close it from workflow action with explicit IDs.",
+        });
+        return;
+      }
+
+      const draft = positionDrafts[position.id];
+      const closePercent = Number(draft?.closePercent || "100");
+
+      if (!Number.isFinite(closePercent) || closePercent <= 0 || closePercent > 100) {
+        setActionMessage({
+          kind: "error",
+          value: "Close percentage must be between 1 and 100.",
         });
         return;
       }
@@ -488,14 +642,25 @@ export default function OstiumPerpsSetupClient() {
           network: derivedNetwork,
           pairId: position.pairId,
           tradeIndex: position.tradeIndex,
+          percent: closePercent,
           idempotencyKey: `ostium-close-${position.pairId}-${position.tradeIndex}-${Date.now()}`,
         });
 
         await refreshHub(true);
         setActionMessage({
           kind: "success",
-          value: `Close request submitted for ${position.marketLabel}.`,
+          value: closePercent === 100
+            ? `Close request submitted for ${position.marketLabel}.`
+            : `Partial close (${closePercent}%) submitted for ${position.marketLabel}.`,
         });
+
+        setPositionDrafts((prev) => ({
+          ...prev,
+          [position.id]: {
+            ...(prev[position.id] || { slPrice: "", tpPrice: "" }),
+            closePercent: "100",
+          },
+        }));
       } catch (error) {
         setActionMessage({
           kind: "error",
@@ -505,7 +670,7 @@ export default function OstiumPerpsSetupClient() {
         setRowActionLoading(null);
       }
     },
-    [derivedNetwork, getPrivyAccessToken, refreshHub],
+    [derivedNetwork, getPrivyAccessToken, positionDrafts, refreshHub],
   );
 
   const runUpdatePriceGuard = useCallback(
@@ -626,6 +791,7 @@ export default function OstiumPerpsSetupClient() {
         next[position.id] = {
           slPrice: normalizePriceDraftValue(slSeed),
           tpPrice: normalizePriceDraftValue(tpSeed),
+          closePercent: prev[position.id]?.closePercent ?? "100",
         };
       }
 
@@ -657,7 +823,8 @@ export default function OstiumPerpsSetupClient() {
     canOpenPosition &&
     openPositionForm.market.length > 0 &&
     Number(openPositionForm.collateral) > 0 &&
-    Number(openPositionForm.leverage) > 0;
+    Number(openPositionForm.leverage) > 0 &&
+    (openPositionForm.orderType === "market" || Number(openPositionForm.triggerPrice) > 0);
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -737,31 +904,93 @@ export default function OstiumPerpsSetupClient() {
         )}
 
         {authenticated && (
-          <div className="space-y-4">
-            <OstiumTradeLauncher
-              canOpenPosition={canOpenPosition}
-              marketOptions={marketOptions}
-              openPositionForm={openPositionForm}
-              setOpenPositionForm={setOpenPositionForm}
-              runOpenPosition={runOpenPosition}
-              canSubmitOpenPosition={canSubmitOpenPosition}
-              openPositionLoading={openPositionLoading}
-              setIsSetupOpen={setIsSetupOpen}
-            />
+          <div className="space-y-6">
+            {/* Tabs Trigger */}
+            <div className="flex gap-2 p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
+              {[
+                { id: "trading", label: "Trading Hub" },
+                { id: "orders", label: "Orders" },
+                { id: "history", label: "History" },
+                { id: "markets", label: "Markets" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as OstiumTab)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id
+                    ? "bg-white/10 text-white shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                    }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-            <OstiumPositionsList
-              parsedPositions={parsedPositions}
-              positionsLoading={positionsState.loading}
-              safeAddress={safeAddress ?? ""}
-              derivedNetwork={derivedNetwork}
-              positionDrafts={positionDrafts}
-              setPositionDrafts={setPositionDrafts}
-              canManagePositions={canManagePositions}
-              rowActionLoading={rowActionLoading}
-              refreshPositions={refreshPositions}
-              runClosePosition={runClosePosition}
-              runUpdatePriceGuard={runUpdatePriceGuard}
-            />
+            {activeTab === "trading" && (
+              <div className="space-y-4 animate-in fade-in duration-500">
+                <OstiumTradeLauncher
+                  canOpenPosition={canOpenPosition}
+                  marketOptions={marketOptions}
+                  openPositionForm={openPositionForm}
+                  setOpenPositionForm={setOpenPositionForm}
+                  runOpenPosition={runOpenPosition}
+                  canSubmitOpenPosition={canSubmitOpenPosition}
+                  openPositionLoading={openPositionLoading}
+                  setIsSetupOpen={setIsSetupOpen}
+                />
+
+                <OstiumPositionsList
+                  parsedPositions={parsedPositions}
+                  positionsLoading={positionsState.loading}
+                  safeAddress={safeAddress ?? ""}
+                  derivedNetwork={derivedNetwork}
+                  positionDrafts={positionDrafts}
+                  setPositionDrafts={setPositionDrafts}
+                  canManagePositions={canManagePositions}
+                  rowActionLoading={rowActionLoading}
+                  refreshPositions={refreshPositions}
+                  runClosePosition={runClosePosition}
+                  runUpdatePriceGuard={runUpdatePriceGuard}
+                />
+              </div>
+            )}
+
+            {activeTab === "orders" && (
+              <div className="animate-in fade-in duration-500">
+                <OstiumOrdersList
+                  orders={ordersState.orders}
+                  loading={ordersState.loading}
+                  safeAddress={safeAddress ?? ""}
+                  canManagePositions={canManagePositions}
+                  refreshOrders={refreshOrders}
+                  cancelOrder={runCancelOrder}
+                />
+              </div>
+            )}
+
+            {activeTab === "history" && (
+              <div className="animate-in fade-in duration-500">
+                <OstiumHistoryList
+                  history={historyState.history}
+                  loading={historyState.loading}
+                  safeAddress={safeAddress ?? ""}
+                />
+              </div>
+            )}
+
+            {activeTab === "markets" && (
+              <div className="animate-in fade-in duration-500">
+                <OstiumMarketStats
+                  marketName={openPositionForm.market || "Select a market"}
+                  fundingRate={marketStats.fundingRate}
+                  rolloverFee={marketStats.rolloverFee}
+                  marketStatus="Active"
+                  isTestnet={derivedNetwork === "testnet"}
+                  faucetLoading={faucetLoading}
+                  runFaucet={runFaucet}
+                />
+              </div>
+            )}
           </div>
         )}
 

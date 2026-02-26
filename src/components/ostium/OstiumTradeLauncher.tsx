@@ -6,12 +6,13 @@ import { Dropdown } from "@/components/ui/Dropdown";
 import { Input } from "@/components/ui/Input";
 import { Typography } from "@/components/ui/Typography";
 import { SimpleCard } from "@/components/ui/SimpleCard";
+import { type OpenPositionForm } from "@/types/ostium";
 
 interface OstiumTradeLauncherProps {
     canOpenPosition: boolean;
     marketOptions: { value: string; label: string }[];
-    openPositionForm: { market: string; side: "long" | "short"; collateral: string; leverage: string };
-    setOpenPositionForm: React.Dispatch<React.SetStateAction<{ market: string; side: "long" | "short"; collateral: string; leverage: string }>>;
+    openPositionForm: OpenPositionForm;
+    setOpenPositionForm: React.Dispatch<React.SetStateAction<OpenPositionForm>>;
     runOpenPosition: () => Promise<void>;
     canSubmitOpenPosition: boolean;
     openPositionLoading: boolean;
@@ -28,6 +29,8 @@ export function OstiumTradeLauncher({
     openPositionLoading,
     setIsSetupOpen,
 }: OstiumTradeLauncherProps) {
+    const isLimitOrStop = openPositionForm.orderType === "limit" || openPositionForm.orderType === "stop";
+
     return (
         <SimpleCard className="overflow-hidden rounded-2xl border-white/6 bg-[#0a0a0e] p-0 hover:bg-[#0a0a0e] hover:border-white/8">
             {/* ── Card Header ── */}
@@ -60,7 +63,7 @@ export function OstiumTradeLauncher({
 
             {/* ── Form Grid ── */}
             <div className="p-6">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {/* Market */}
                     <div className="space-y-1.5">
                         <Typography variant="caption" className="font-medium uppercase tracking-wider text-zinc-500 block">
@@ -110,6 +113,29 @@ export function OstiumTradeLauncher({
                         />
                     </div>
 
+                    {/* Order Type */}
+                    <div className="space-y-1.5">
+                        <Typography variant="caption" className="font-medium uppercase tracking-wider text-zinc-500 block">
+                            Order Type
+                        </Typography>
+                        <Dropdown
+                            value={openPositionForm.orderType}
+                            onChange={(e) =>
+                                setOpenPositionForm((prev) => ({
+                                    ...prev,
+                                    orderType: e.target.value as any,
+                                }))
+                            }
+                            options={[
+                                { value: "market", label: "Market" },
+                                { value: "limit", label: "Limit" },
+                                { value: "stop", label: "Stop" },
+                            ]}
+                            placeholder="Select type"
+                            className="h-11 bg-white/3 border-white/8 hover:border-white/14 rounded-lg"
+                        />
+                    </div>
+
                     {/* Collateral */}
                     <div className="space-y-1.5">
                         <Typography variant="caption" className="font-medium uppercase tracking-wider text-zinc-500 block">
@@ -139,10 +165,57 @@ export function OstiumTradeLauncher({
                             className="h-11 bg-white/3 border-white/8 hover:border-white/14 rounded-lg"
                         />
                     </div>
+
+                    {/* Trigger Price - Conditional */}
+                    {isLimitOrStop && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-300">
+                            <Typography variant="caption" className="font-medium uppercase tracking-wider text-zinc-500 block">
+                                Trigger Price
+                            </Typography>
+                            <Input
+                                value={openPositionForm.triggerPrice}
+                                onChange={(e) =>
+                                    setOpenPositionForm((prev) => ({ ...prev, triggerPrice: e.target.value }))
+                                }
+                                placeholder="50000"
+                                className="h-11 bg-white/3 border-amber-500/20 hover:border-amber-500/40 rounded-lg"
+                            />
+                        </div>
+                    )}
+
+                    {/* Stop Loss (Optional) */}
+                    <div className="space-y-1.5">
+                        <Typography variant="caption" className="font-medium uppercase tracking-wider text-zinc-500 block">
+                            Stop Loss (Optional)
+                        </Typography>
+                        <Input
+                            value={openPositionForm.slPrice}
+                            onChange={(e) =>
+                                setOpenPositionForm((prev) => ({ ...prev, slPrice: e.target.value }))
+                            }
+                            placeholder="45000"
+                            className="h-11 bg-white/3 border-white/8 hover:border-orange-500/40 rounded-lg"
+                        />
+                    </div>
+
+                    {/* Take Profit (Optional) */}
+                    <div className="space-y-1.5">
+                        <Typography variant="caption" className="font-medium uppercase tracking-wider text-zinc-500 block">
+                            Take Profit (Optional)
+                        </Typography>
+                        <Input
+                            value={openPositionForm.tpPrice}
+                            onChange={(e) =>
+                                setOpenPositionForm((prev) => ({ ...prev, tpPrice: e.target.value }))
+                            }
+                            placeholder="60000"
+                            className="h-11 bg-white/3 border-white/8 hover:border-blue-500/40 rounded-lg"
+                        />
+                    </div>
                 </div>
 
                 {/* ── Actions ── */}
-                <div className="mt-5 flex flex-wrap items-center gap-3">
+                <div className="mt-6 flex flex-wrap items-center gap-3">
                     <Button
                         type="button"
                         className="h-11 px-7"
@@ -156,7 +229,9 @@ export function OstiumTradeLauncher({
                         ) : (
                             <LuTrendingUp className="h-4 w-4" />
                         )}
-                        Open Position
+                        {openPositionForm.orderType === "market"
+                            ? "Open Market Position"
+                            : `Place ${openPositionForm.orderType.charAt(0).toUpperCase() + openPositionForm.orderType.slice(1)} Order`}
                     </Button>
                     {!canOpenPosition && (
                         <Button

@@ -14,13 +14,9 @@ import {
     OSTIUM_NETWORK_LABELS,
     type OstiumNetwork,
     type ParsedOstiumPosition,
+    type PositionDraft,
     formatAddress,
 } from "@/types/ostium";
-
-interface PositionDraft {
-    slPrice: string;
-    tpPrice: string;
-}
 
 interface RowActionLoading {
     id: string;
@@ -135,10 +131,10 @@ export function OstiumPositionsList({
                                     </div>
                                     <span
                                         className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ${position.side === "LONG"
-                                                ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                                                : position.side === "SHORT"
-                                                    ? "border border-red-500/20 bg-red-500/10 text-red-400"
-                                                    : "border border-white/10 bg-white/5 text-zinc-400"
+                                            ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                                            : position.side === "SHORT"
+                                                ? "border border-red-500/20 bg-red-500/10 text-red-400"
+                                                : "border border-white/10 bg-white/5 text-zinc-400"
                                             }`}
                                     >
                                         {position.side === "LONG" ? (
@@ -200,8 +196,34 @@ export function OstiumPositionsList({
                                 {/* ── Action Zone ── */}
                                 <div className="m-5 mt-3 rounded-xl border border-white/4 bg-white/2 p-4">
                                     <div className="grid grid-cols-1 items-end gap-3 lg:grid-cols-12">
-                                        {/* Close Position */}
-                                        <div className="lg:col-span-3">
+                                        {/* Partial Close Slider */}
+                                        <div className="lg:col-span-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Typography variant="caption" className="text-zinc-500 font-medium">
+                                                    Close Amount: <span className="text-white">{draft.closePercent}%</span>
+                                                </Typography>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="100"
+                                                step="1"
+                                                value={draft.closePercent}
+                                                onChange={(e) =>
+                                                    setPositionDrafts((prev) => ({
+                                                        ...prev,
+                                                        [position.id]: {
+                                                            ...prev[position.id],
+                                                            closePercent: e.target.value,
+                                                        },
+                                                    }))
+                                                }
+                                                className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                            />
+                                        </div>
+
+                                        {/* Close Button */}
+                                        <div className="lg:col-span-2">
                                             <Button
                                                 variant="delete"
                                                 border
@@ -212,20 +234,20 @@ export function OstiumPositionsList({
                                                 {isCloseLoading ? (
                                                     <LuLoader className="h-4 w-4 animate-spin" />
                                                 ) : null}
-                                                {isCloseLoading ? "Closing..." : "Close"}
+                                                {isCloseLoading ? "Processing..." : draft.closePercent === "100" ? "Close" : `Close ${draft.closePercent}%`}
                                             </Button>
                                         </div>
 
                                         {/* SL Input */}
-                                        <div className="lg:col-span-3">
+                                        <div className="lg:col-span-2">
                                             <Input
                                                 value={draft.slPrice}
                                                 onChange={(e) =>
                                                     setPositionDrafts((prev) => ({
                                                         ...prev,
                                                         [position.id]: {
+                                                            ...prev[position.id],
                                                             slPrice: e.target.value,
-                                                            tpPrice: prev[position.id]?.tpPrice || "",
                                                         },
                                                     }))
                                                 }
@@ -235,11 +257,11 @@ export function OstiumPositionsList({
                                         </div>
 
                                         {/* SL Button */}
-                                        <div className="lg:col-span-2">
+                                        <div className="lg:col-span-1">
                                             <Button
                                                 border
                                                 borderColor="rgba(245,158,11,0.7)"
-                                                className="h-10 w-full rounded-lg border text-sm"
+                                                className="h-10 w-full rounded-lg border text-sm px-0"
                                                 onClick={() => void runUpdatePriceGuard(position, "sl")}
                                                 disabled={!canManagePositions || !hasExecutableIds || isSlLoading}
                                             >
@@ -258,7 +280,7 @@ export function OstiumPositionsList({
                                                     setPositionDrafts((prev) => ({
                                                         ...prev,
                                                         [position.id]: {
-                                                            slPrice: prev[position.id]?.slPrice || "",
+                                                            ...prev[position.id],
                                                             tpPrice: e.target.value,
                                                         },
                                                     }))
@@ -269,11 +291,11 @@ export function OstiumPositionsList({
                                         </div>
 
                                         {/* TP Button */}
-                                        <div className="lg:col-span-2">
+                                        <div className="lg:col-span-1">
                                             <Button
                                                 border
                                                 borderColor="rgba(96,165,250,0.7)"
-                                                className="h-10 w-full rounded-lg border text-sm"
+                                                className="h-10 w-full rounded-lg border text-sm px-0"
                                                 onClick={() => void runUpdatePriceGuard(position, "tp")}
                                                 disabled={!canManagePositions || !hasExecutableIds || isTpLoading}
                                             >

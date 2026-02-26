@@ -6,13 +6,23 @@ export type OstiumNetwork = "testnet" | "mainnet";
 
 export type OstiumAction =
   | "MARKETS"
+  | "MARKET_DETAILS"
+  | "MARKET_FUNDING"
+  | "MARKET_ROLLOVER"
   | "PRICE"
   | "BALANCE"
+  | "FAUCET"
+  | "HISTORY"
   | "LIST_POSITIONS"
+  | "POSITION_METRICS"
   | "OPEN_POSITION"
   | "CLOSE_POSITION"
   | "UPDATE_SL"
-  | "UPDATE_TP";
+  | "UPDATE_TP"
+  | "LIST_ORDERS"
+  | "CANCEL_ORDER"
+  | "UPDATE_ORDER"
+  | "TRACK_ORDER";
 
 export type OstiumSide = "long" | "short";
 
@@ -23,13 +33,23 @@ export const OSTIUM_NETWORK_LABELS: Record<OstiumNetwork, string> = {
 
 export const OSTIUM_ACTION_LABELS: Record<OstiumAction, string> = {
   MARKETS: "List Markets",
+  MARKET_DETAILS: "Market Details",
+  MARKET_FUNDING: "Market Funding",
+  MARKET_ROLLOVER: "Market Rollover",
   PRICE: "Get Price",
   BALANCE: "Get Balance",
+  FAUCET: "Request Faucet",
+  HISTORY: "Trade History",
   LIST_POSITIONS: "List Positions",
+  POSITION_METRICS: "Position Metrics",
   OPEN_POSITION: "Open Position",
   CLOSE_POSITION: "Close Position",
   UPDATE_SL: "Update Stop-Loss",
   UPDATE_TP: "Update Take-Profit",
+  LIST_ORDERS: "List Orders",
+  CANCEL_ORDER: "Cancel Order",
+  UPDATE_ORDER: "Update Order",
+  TRACK_ORDER: "Track Order",
 };
 
 export const OSTIUM_ACTIONS: OstiumAction[] = [
@@ -41,6 +61,8 @@ export const OSTIUM_ACTIONS: OstiumAction[] = [
   "LIST_POSITIONS",
   "UPDATE_SL",
   "UPDATE_TP",
+  "LIST_ORDERS",
+  "HISTORY",
 ];
 
 export const OSTIUM_PANEL_ACTIONS: OstiumAction[] = [
@@ -55,7 +77,9 @@ export function actionRequiresDelegation(action: OstiumAction): boolean {
     action === "OPEN_POSITION" ||
     action === "CLOSE_POSITION" ||
     action === "UPDATE_SL" ||
-    action === "UPDATE_TP"
+    action === "UPDATE_TP" ||
+    action === "CANCEL_ORDER" ||
+    action === "UPDATE_ORDER"
   );
 }
 
@@ -134,7 +158,71 @@ export interface ParsedOstiumPosition {
   pnl: string;
   currentSl: string;
   currentTp: string;
+  metrics?: OstiumPositionMetrics | null;
   raw: JsonRecord;
+}
+
+export interface OpenPositionForm {
+  market: string;
+  side: "long" | "short";
+  collateral: string;
+  leverage: string;
+  orderType: "market" | "limit" | "stop";
+  triggerPrice: string;
+  slPrice: string;
+  tpPrice: string;
+}
+
+export interface PositionDraft {
+  slPrice: string;
+  tpPrice: string;
+  closePercent: string;
+}
+
+export interface OstiumOrder {
+  orderId: string;
+  pairId: number;
+  marketLabel: string;
+  side: OstiumSide;
+  collateral: string;
+  leverage: string;
+  orderType: "market" | "limit" | "stop";
+  triggerPrice: string;
+  slPrice: string;
+  tpPrice: string;
+  status: string;
+  timestamp: string;
+}
+
+export interface OstiumHistoryItem {
+  id: string;
+  action: string;
+  market: string;
+  side: string;
+  size: string;
+  price: string;
+  pnl: string;
+  timestamp: string;
+}
+
+export interface OstiumMarketDetails {
+  pairId: number;
+  symbol: string;
+  status: string;
+  fundingRate: string;
+  rolloverFee: string;
+  minCollateral: string;
+  maxLeverage: string;
+}
+
+export interface OstiumPositionMetrics {
+  pairId: number;
+  tradeIndex: number;
+  pnlUsd: string;
+  pnlPercent: string;
+  liqPrice: string;
+  fundingFee: string;
+  rolloverFee: string;
 }
 
 export function toRecord(value: unknown): JsonRecord | null {
