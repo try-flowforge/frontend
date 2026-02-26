@@ -143,7 +143,8 @@ const ChainProgressCard: React.FC<ChainProgressCardProps> = ({
         progress.moduleVerify === "success";
 
     const steps = [
-        { key: "walletCreate", label: "Wallet Creation", desc: "Creating Your Safe Wallet on the Blockchain", status: progress.walletCreate },
+        { key: "fetchExisting", label: "Find existing Safe", desc: "Checking for existing Safe wallet for your address", status: progress.fetchExisting ?? "idle" },
+        { key: "walletCreate", label: "Wallet Creation", desc: "Creating or using your Safe wallet on the blockchain", status: progress.walletCreate },
         { key: "moduleSign", label: "Sign Module", desc: "Authorizing your wallet for automation", status: progress.moduleSign, isSigning: true },
         { key: "moduleEnable", label: "Enable Module", desc: "Enabling automation modules for your wallet", status: progress.moduleEnable },
         { key: "moduleVerify", label: "Final Verification", desc: "Verifying workflow execution set-up for the selected chain", status: progress.moduleVerify },
@@ -425,6 +426,7 @@ export const SetupExecutionStep = () => {
                             <ChainProgressCard
                                 chain={chain}
                                 progress={progress[chain.id] || {
+                                    fetchExisting: "idle",
                                     walletCreate: "idle",
                                     moduleSign: "idle",
                                     moduleEnable: "idle",

@@ -81,6 +81,7 @@ export const API_CONFIG = {
     },
     RELAY: {
       CREATE_SAFE: "/relay/create-safe",
+      EXISTING_SAFE: "/relay/existing-safe",
       SYNC_SAFE_FROM_TX: "/relay/sync-safe-from-tx",
       ENABLE_MODULE: "/relay/enable-module",
     },

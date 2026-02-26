@@ -10,7 +10,7 @@ import React, {
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { usePrivyWallet } from "@/hooks/usePrivyWallet";
 import { useCreateSafeWallet } from "@/web3/hooks/useCreateSafeWallet";
-import { API_CONFIG } from "@/config/api";
+import { API_CONFIG, buildApiUrl } from "@/config/api";
 import { ChainInfo, getChain } from "@/web3/config/chain-registry";
 import { validateAndGetOnboardingChains } from "../utils/config";
 import { ensureChainSelected, waitForChain } from "../utils/chain-switcher";
@@ -23,6 +23,8 @@ type OverallStatus = "idle" | "in-progress" | "error" | "complete";
 
 // Progress for a single chain
 export interface ChainProgress {
+    /** Check for existing Safe for this owner (before creating). Optional for backwards compat. */
+    fetchExisting?: OnboardingStepStatus;
     walletCreate: OnboardingStepStatus;
     moduleSign: OnboardingStepStatus;
     moduleEnable: OnboardingStepStatus;
@@ -122,6 +124,7 @@ const initializeProgress = (chains: ChainConfig[]): Record<string, ChainProgress
     const progress: Record<string, ChainProgress> = {};
     for (const chain of chains) {
         progress[chain.id] = {
+            fetchExisting: "idle",
             walletCreate: "idle",
             moduleSign: "idle",
             moduleEnable: "idle",
@@ -381,6 +384,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                                 const c = getChain(chain.chainId);
                                 if (user?.safe_wallets?.[String(c?.chainId || chain.chainId)]) {
                                     updated[chain.id] = {
+                                        fetchExisting: "success",
                                         walletCreate: "success",
                                         moduleSign: "success",
                                         moduleEnable: "success",
@@ -458,28 +462,68 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             try {
-                // Step 1: Create wallet
+                // Step 1: Check for existing Safe first (e.g. after DB clear), then create if needed
                 setProgress((prev) => ({
                     ...prev,
-                    [chainKey]: { ...prev[chainKey], walletCreate: "pending", error: undefined },
+                    [chainKey]: {
+                        ...prev[chainKey],
+                        fetchExisting: "pending",
+                        walletCreate: "pending",
+                        error: undefined,
+                    },
                 }));
 
-                // Use the updated createSafeWallet hook with targetChainId
-                const createResult = await createSafeWallet(walletAddress || "", numericChainId);
+                let safeAddress: string | undefined;
 
-                if (!createResult.success) {
+                const accessToken = await getPrivyAccessToken();
+                if (accessToken) {
+                    const existingRes = await fetch(
+                        `${buildApiUrl(API_CONFIG.ENDPOINTS.RELAY.EXISTING_SAFE)}?chainId=${numericChainId}`,
+                        { headers: { Authorization: `Bearer ${accessToken}` } }
+                    );
+                    const existingData = await existingRes.json().catch(() => ({}));
+                    if (existingData.success && existingData.exists && existingData.safeAddress) {
+                        safeAddress = existingData.safeAddress;
+                        setProgress((prev) => ({
+                            ...prev,
+                            [chainKey]: {
+                                ...prev[chainKey],
+                                fetchExisting: "success",
+                                walletCreate: "success",
+                                safeAddress,
+                            },
+                        }));
+                    }
+                }
+
+                setProgress((prev) => ({
+                    ...prev,
+                    [chainKey]: { ...prev[chainKey], fetchExisting: "success" },
+                }));
+
+                if (!safeAddress) {
+                    const createResult = await createSafeWallet(walletAddress || "", numericChainId);
+                    if (!createResult.success) {
+                        setProgress((prev) => ({
+                            ...prev,
+                            [chainKey]: { ...prev[chainKey], walletCreate: "error", error: createResult.error },
+                        }));
+                        return false;
+                    }
+                    safeAddress = createResult.safeAddress!;
                     setProgress((prev) => ({
                         ...prev,
-                        [chainKey]: { ...prev[chainKey], walletCreate: "error", error: createResult.error },
+                        [chainKey]: { ...prev[chainKey], walletCreate: "success", safeAddress },
+                    }));
+                }
+
+                if (!safeAddress) {
+                    setProgress((prev) => ({
+                        ...prev,
+                        [chainKey]: { ...prev[chainKey], walletCreate: "error", error: "No Safe address available." },
                     }));
                     return false;
                 }
-
-                const safeAddress = createResult.safeAddress!;
-                setProgress((prev) => ({
-                    ...prev,
-                    [chainKey]: { ...prev[chainKey], walletCreate: "success", safeAddress },
-                }));
 
                 // Step 2: Switch to target chain before signing
                 setProgress((prev) => ({
@@ -667,13 +711,17 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             }
         }
 
-        // Refresh user data
+        // Refresh user data in context
         await fetchUserData();
 
         // Check if all chains are complete
         if (allSuccessful) {
             setNeedsOnboarding(false);
             completeStep("setup");
+            // Notify other components (e.g. UserMenu) to refetch profile so Safe addresses update
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("flowforge:profile-invalidate"));
+            }
         }
 
         setIsOnboarding(false);
@@ -703,6 +751,9 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     setNeedsOnboarding(false);
                     setIsOnboarding(false);
                     completeStep("setup");
+                    if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("flowforge:profile-invalidate"));
+                    }
                 }
             }
         },
