@@ -102,6 +102,8 @@ interface OnboardingContextType {
     dismissOnboarding: () => void;
     toggleMinimize: () => void;
     expandWizard: () => void;
+    /** Open the setup wizard for the given chains (e.g. from "Setup on this chain" in UserMenu). */
+    openSetupWizard: (chains: ChainInfo[]) => void;
 
     goToStep: (step: OnboardingStep) => void;
     completeStep: (step: OnboardingStep) => void;
@@ -680,6 +682,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             ethereumProvider,
             walletAddress,
             wallets,
+            getPrivyAccessToken,
         ]
     );
 
@@ -777,6 +780,13 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsMinimized(false);
     }, []);
 
+    const openSetupWizard = useCallback((chains: ChainInfo[]) => {
+        setNeedsOnboarding(true);
+        setSelectedChains(chains);
+        goToStep("setup");
+        setIsMinimized(false);
+    }, [setSelectedChains, goToStep]);
+
     const contextValue = useMemo<OnboardingContextType>(
         () => ({
             needsOnboarding,
@@ -803,6 +813,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             hasError,
             toggleMinimize,
             expandWizard,
+            openSetupWizard,
 
             // Wizard
             currentStep,
@@ -829,6 +840,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
             dismissOnboarding,
             toggleMinimize,
             expandWizard,
+            openSetupWizard,
             setChainSelectionDone,
             setSelectedChains,
             saveUserChains,

@@ -87,21 +87,41 @@ export function TransactionSigningModal({
             // Mainnet: backend returned payload for client submission (user pays gas)
             if (data?.data?.submitOnClient && data?.data?.payload && ethereumProvider) {
                 const { payload } = data.data;
+                const to = payload?.to;
+                const txData = payload?.data;
+                const isValidAddress =
+                    typeof to === "string" && to.startsWith("0x") && to.length === 42;
+                if (!to || !txData || !isValidAddress) {
+                    throw new Error(
+                        "Invalid parameters: the server did not return a valid transaction (missing or invalid 'to' address). Please try again or contact support."
+                    );
+                }
                 try {
                     await ethereumProvider.request({
                         method: "wallet_switchEthereumChain",
-                        params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+                        params: [{ chainId: `0x${Number(payload?.chainId ?? 0).toString(16)}` }],
                     });
                 } catch (e) {
                     console.warn("Chain switch failed", e);
                 }
+                const accounts = (await ethereumProvider.request({
+                    method: "eth_requestAccounts",
+                })) as string[];
+                const from = accounts?.[0];
+                const txParams: { to: string; data: string; value: string; from?: string } = {
+                    to,
+                    data: txData,
+                    value:
+                        typeof payload?.value === "string"
+                            ? payload.value
+                            : typeof payload?.value === "number"
+                                ? `0x${payload.value.toString(16)}`
+                                : "0x0",
+                };
+                if (from) txParams.from = from;
                 const txHash = (await ethereumProvider.request({
                     method: "eth_sendTransaction",
-                    params: [{
-                        to: payload.to,
-                        data: payload.data,
-                        value: payload.value || "0x0",
-                    }],
+                    params: [txParams],
                 })) as string;
                 if (txHash && data.data.executionId) {
                     const token2 = await getPrivyAccessToken();

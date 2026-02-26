@@ -471,15 +471,15 @@ export const SetupExecutionStep = () => {
                             animate={{ opacity: 1, y: 0 }}
                             className="flex flex-col items-center gap-2"
                         >
-                            <p className="text-sm text-primary font-bold flex items-center gap-3 bg-primary/5 px-4 py-2 rounded-full border border-primary/20">
-                                <motion.div
+                            <div className="text-sm text-primary font-bold flex items-center gap-3 bg-primary/5 px-4 py-2 rounded-full border border-primary/20">
+                                <motion.span
                                     animate={{ rotate: [0, 15, -15, 0] }}
                                     transition={{ repeat: Infinity, duration: 1 }}
                                 >
                                     <FaPen className="w-4 h-4 text-primary" />
-                                </motion.div>
+                                </motion.span>
                                 Signing required
-                            </p>
+                            </div>
                         </motion.div>
                     ) : allIdle && !isOnboarding ? (
                         <motion.div
