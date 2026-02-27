@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy, useWallets, useLinkAccount, useCreateWallet } from "@privy-io/react-auth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthenticationStatus } from "@/components/workspace/AuthenticationStatus";
 import { useSafeWalletContext } from "@/context/SafeWalletContext";
@@ -17,10 +17,16 @@ import {
   getChainProgress,
   isChainSetupComplete,
 } from "./components/walletSetupUtils";
+import { Button } from "@/components/ui/Button";
+import { FaWallet, FaPlus } from "react-icons/fa";
 
 function WalletNodeConfigurationInner() {
-  const { wallets } = useWallets();
+  const { wallets = [], ready: walletsReady } = useWallets();
   const { authenticated } = usePrivy();
+  const { linkWallet } = useLinkAccount();
+  const { createWallet } = useCreateWallet();
+  const [isCreating, setIsCreating] = useState(false);
+
   const linkedWallets = wallets.filter(
     (wallet) => wallet.linked || wallet.walletClientType === "privy",
   );
@@ -28,6 +34,7 @@ function WalletNodeConfigurationInner() {
     linkedWallets.find((wallet) => wallet.walletClientType !== "privy") ||
     linkedWallets.find((wallet) => wallet.walletClientType === "privy");
   const address = primaryWallet?.address;
+  const hasLinkedWallet = linkedWallets.length > 0;
 
   const { selection, creation } = useSafeWalletContext();
   const {
@@ -181,6 +188,44 @@ function WalletNodeConfigurationInner() {
 
   return (
     <div className="space-y-4">
+      {!hasLinkedWallet && (
+        <div className="p-5 rounded-xl border-2 border-amber-500/50 bg-amber-500/10 space-y-3">
+          <p className="text-sm font-semibold text-foreground">
+            Connect a wallet to continue
+          </p>
+          <p className="text-xs text-muted-foreground">
+            You need a linked wallet to set up Safe wallets and run workflows. Connect an existing wallet or create an embedded wallet below.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              onClick={() => linkWallet()}
+              disabled={!walletsReady}
+              className="gap-2"
+            >
+              <FaWallet className="w-4 h-4" />
+              {walletsReady ? "Connect external wallet" : "Loading…"}
+            </Button>
+            <Button
+              onClick={async () => {
+                setIsCreating(true);
+                try {
+                  await createWallet();
+                } catch {
+                  // ignore
+                } finally {
+                  setIsCreating(false);
+                }
+              }}
+              disabled={!walletsReady || isCreating}
+              className="gap-2 bg-transparent hover:bg-white/10 border border-white/20"
+            >
+              <FaPlus className="w-4 h-4" />
+              {isCreating ? "Creating…" : "Create embedded wallet"}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <WalletNetworkSelectionCard
         availableChains={availableChains}
         selectedChainIds={selectedChainIds}
@@ -201,9 +246,23 @@ function WalletNodeConfigurationInner() {
         allChainsReady={allChainsReady}
         hasUnsavedChainSelection={hasUnsavedChainSelection}
         isSavingChains={isSavingChains}
+        hasLinkedWallet={hasLinkedWallet}
         onToggleExpanded={() => setIsSetupExpanded((previous) => !previous)}
         onRetryChain={(chainId) => void retryChain(chainId)}
         onRunSetup={() => void runChainSetup()}
+        onConnectWallet={() => linkWallet()}
+        onCreateWallet={async () => {
+          setIsCreating(true);
+          try {
+            await createWallet();
+          } catch {
+            // ignore
+          } finally {
+            setIsCreating(false);
+          }
+        }}
+        walletsReady={walletsReady}
+        isCreatingWallet={isCreating}
       />
 
       <WalletSafeInfoCard address={address} selection={selection} />

@@ -58,14 +58,15 @@ export const OnboardingWizard: React.FC = () => {
         isMinimized,
         toggleMinimize,
         dismissOnboarding,
+        goToStep,
     } = useOnboarding();
     const { authenticated } = usePrivy();
 
     const steps = useMemo(
         () => [
-            { id: "wallet", label: "Wallet Choice" },
-            { id: "chain", label: "Network Selection" },
-            { id: "setup", label: "Safe Wallet Set-up" },
+            { id: "wallet" as const, label: "Wallet Choice" },
+            { id: "chain" as const, label: "Network Selection" },
+            { id: "setup" as const, label: "Safe Wallet Set-up" },
         ],
         []
     );
@@ -241,6 +242,10 @@ export const OnboardingWizard: React.FC = () => {
                             <WizardStepper
                                 steps={steps}
                                 currentStepIndex={stepIndex}
+                                onStepClick={(idx) => {
+                                    const stepId = steps[idx]?.id;
+                                    if (stepId) goToStep(stepId);
+                                }}
                             />
                         </div>
 

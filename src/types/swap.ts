@@ -11,12 +11,8 @@
 // These re-exports maintain backward compatibility for existing imports.
 export { getSwapTokensForChain as getTokensForChain } from "@/web3/config/token-registry";
 
-// Supported Swap Providers
 export enum SwapProvider {
-    UNISWAP = 'UNISWAP',
     UNISWAP_V4 = 'UNISWAP_V4',
-    RELAY = 'RELAY',
-    ONEINCH = 'ONEINCH',
     LIFI = 'LIFI',
 }
 
@@ -57,7 +53,6 @@ export interface SwapInputConfig {
 
     // Advanced options
     recipient?: string; // If different from walletAddress
-    enablePartialFill?: boolean; // For 1inch provider
     simulateFirst?: boolean; // Default: true - simulate before executing
 }
 
@@ -108,11 +103,8 @@ export function allowsCustomTokens(_chain: string): boolean {
 
 // Display labels for enums
 export const PROVIDER_LABELS: Record<SwapProvider, string> = {
-    [SwapProvider.UNISWAP]: 'Uniswap',
     [SwapProvider.UNISWAP_V4]: 'Uniswap V4',
-    [SwapProvider.RELAY]: 'Relay',
-    [SwapProvider.ONEINCH]: '1inch',
-    [SwapProvider.LIFI]: 'LI.FI',
+    [SwapProvider.LIFI]: 'LiFi',
 };
 
 export const SWAP_TYPE_LABELS: Record<SwapType, string> = {

@@ -173,3 +173,17 @@ body {
 .react-flow__attribution {
   display: none !important;
 }
+
+/* ── Ostium Dashboard Animations ── */
+@keyframes ostium-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.12), 0 0 60px rgba(249, 115, 22, 0.04);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(249, 115, 22, 0.22), 0 0 80px rgba(249, 115, 22, 0.08);
+  }
+}
+
+.animate-glow-orange {
+  animation: ostium-glow 3s ease-in-out infinite;
+}

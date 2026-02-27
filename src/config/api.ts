@@ -42,6 +42,7 @@ export const API_CONFIG = {
       BUILD_TRANSACTION: "/swaps/build-transaction",
       BUILD_SAFE_TRANSACTION: "/swaps/build-safe-transaction",
       EXECUTE_WITH_SIGNATURE: "/swaps/execute-with-signature",
+      REPORT_CLIENT_TX: "/swaps/report-client-tx",
       PROVIDERS: "/swaps/providers",
       EXECUTIONS: "/swaps/executions",
     },
@@ -68,6 +69,7 @@ export const API_CONFIG = {
       DELEGATION_STATUS: "/ostium/delegations/status",
       DELEGATION_REVOKE_PREPARE: "/ostium/delegations/revoke/prepare",
       DELEGATION_REVOKE_EXECUTE: "/ostium/delegations/revoke/execute",
+      SETUP_OVERVIEW: "/ostium/setup/overview",
       READINESS: "/ostium/readiness",
       ALLOWANCE_PREPARE: "/ostium/allowance/prepare",
       ALLOWANCE_EXECUTE: "/ostium/allowance/execute",
@@ -79,6 +81,8 @@ export const API_CONFIG = {
     },
     RELAY: {
       CREATE_SAFE: "/relay/create-safe",
+      EXISTING_SAFE: "/relay/existing-safe",
+      SYNC_SAFE_FROM_TX: "/relay/sync-safe-from-tx",
       ENABLE_MODULE: "/relay/enable-module",
     },
     META: {
@@ -88,10 +92,7 @@ export const API_CONFIG = {
       FEEDS: "/oracle/feeds",
       CONFIG: "/oracle/config",
     },
-    ENS: {
-      SUBDOMAIN_REGISTERED: "/ens/subdomain-registered",
-      SUBDOMAINS: "/ens/subdomains",
-    },
+
   },
 
   // OAuth polling configuration

@@ -16,8 +16,6 @@ function categorizeDefiBlocks(blocks: BlockDefinition[]) {
   const swapBlocks = blocks.filter(
     (block) =>
       block.nodeType === "uniswap" ||
-      block.nodeType === "relay" ||
-      block.nodeType === "oneinch" ||
       block.nodeType === "lifi"
   );
   const lendingBlocks = blocks.filter(

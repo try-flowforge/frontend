@@ -130,10 +130,8 @@ export function TemplateFieldSelector({
             { path: "sentAt", label: "Sent At", blockName, blockType }
           );
           break;
-
+        case "lifi":
         case "uniswap":
-        case "relay":
-        case "oneinch":
           nodeFields.push(
             { path: "txHash", label: "Transaction Hash", blockName, blockType },
             { path: "amountIn", label: "Amount In", blockName, blockType },
@@ -189,8 +187,6 @@ export function TemplateFieldSelector({
       case "telegram":
         return "message"; // Message content
       case "uniswap":
-      case "relay":
-      case "oneinch":
         return "txHash"; // Transaction hash
       default:
         return null; // Fall back to entire output

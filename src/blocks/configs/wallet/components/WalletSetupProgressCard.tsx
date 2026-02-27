@@ -4,6 +4,7 @@ import { Typography } from "@/components/ui/Typography";
 import { ChainProgress } from "@/onboarding/context/OnboardingContext";
 import { ChainInfo } from "@/web3/config/chain-registry";
 import { LuChevronDown, LuChevronUp, LuRefreshCw } from "react-icons/lu";
+import { FaWallet, FaPlus } from "react-icons/fa";
 import { SetupStatusIcon } from "./SetupStatusIcon";
 import {
   SETUP_STEPS,
@@ -23,9 +24,14 @@ interface WalletSetupProgressCardProps {
   allChainsReady: boolean;
   hasUnsavedChainSelection: boolean;
   isSavingChains: boolean;
+  hasLinkedWallet: boolean;
   onToggleExpanded: () => void;
   onRetryChain: (chainId: string) => void;
   onRunSetup: () => void;
+  onConnectWallet?: () => void;
+  onCreateWallet?: () => void;
+  walletsReady?: boolean;
+  isCreatingWallet?: boolean;
 }
 
 export function WalletSetupProgressCard({
@@ -38,10 +44,18 @@ export function WalletSetupProgressCard({
   allChainsReady,
   hasUnsavedChainSelection,
   isSavingChains,
+  hasLinkedWallet,
   onToggleExpanded,
   onRetryChain,
   onRunSetup,
+  onConnectWallet,
+  onCreateWallet,
+  walletsReady = true,
+  isCreatingWallet = false,
 }: WalletSetupProgressCardProps) {
+  const hasWalletNotConnectedError = chainsToSetup.some(
+    (chain) => getChainProgress(progress, chain.id).error?.toLowerCase().includes("wallet not connected"),
+  );
   return (
     <SimpleCard className="p-5">
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -144,15 +158,64 @@ export function WalletSetupProgressCard({
                 </div>
 
                 {chainProgress.error && (
-                  <div className="mt-3 p-2.5 rounded-md bg-destructive/10 border border-destructive/20">
-                    <Typography variant="caption" className="text-destructive text-[11px]">
-                      {chainProgress.error}
-                    </Typography>
+                  <div className="mt-3 space-y-2">
+                    <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/20">
+                      <Typography variant="caption" className="text-destructive text-[11px]">
+                        {chainProgress.error}
+                      </Typography>
+                    </div>
+                    {chainProgress.error.toLowerCase().includes("wallet not connected") &&
+                      onConnectWallet &&
+                      onCreateWallet && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            onClick={onConnectWallet}
+                            disabled={!walletsReady}
+                            className="gap-2 h-8 text-xs"
+                          >
+                            <FaWallet className="w-3 h-3" />
+                            Connect wallet
+                          </Button>
+                          <Button
+                            onClick={onCreateWallet}
+                            disabled={!walletsReady || isCreatingWallet}
+                            className="gap-2 h-8 text-xs bg-transparent hover:bg-white/10 border border-white/20"
+                          >
+                            <FaPlus className="w-3 h-3" />
+                            {isCreatingWallet ? "Creating…" : "Create wallet"}
+                          </Button>
+                        </div>
+                      )}
                   </div>
                 )}
               </div>
             );
           })}
+
+          {!hasLinkedWallet && hasWalletNotConnectedError && onConnectWallet && onCreateWallet && (
+            <div className="p-4 rounded-lg border-2 border-amber-500/40 bg-amber-500/10 space-y-3">
+              <Typography variant="caption" className="text-foreground text-xs font-medium">
+                Wallet required
+              </Typography>
+              <Typography variant="caption" className="text-muted-foreground text-[11px] block">
+                Connect or create a wallet to initialize your Safe on the selected networks.
+              </Typography>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={onConnectWallet} disabled={!walletsReady} className="gap-2 h-9 text-xs">
+                  <FaWallet className="w-3.5 h-3.5" />
+                  Connect external wallet
+                </Button>
+                <Button
+                  onClick={onCreateWallet}
+                  disabled={!walletsReady || isCreatingWallet}
+                  className="gap-2 h-9 text-xs bg-transparent hover:bg-white/10 border border-white/20"
+                >
+                  <FaPlus className="w-3.5 h-3.5" />
+                  {isCreatingWallet ? "Creating…" : "Create embedded wallet"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {currentSigningChainName && (
             <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/40">

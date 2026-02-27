@@ -80,9 +80,62 @@ export function TransactionSigningModal({
                 }
             );
 
+            const data = await res.json();
             if (!res.ok) {
-                const data = await res.json();
                 throw new Error(data.error || "Failed to submit signature");
+            }
+            // Mainnet: backend returned payload for client submission (user pays gas)
+            if (data?.data?.submitOnClient && data?.data?.payload && ethereumProvider) {
+                const { payload } = data.data;
+                const to = payload?.to;
+                const txData = payload?.data;
+                const isValidAddress =
+                    typeof to === "string" && to.startsWith("0x") && to.length === 42;
+                if (!to || !txData || !isValidAddress) {
+                    throw new Error(
+                        "Invalid parameters: the server did not return a valid transaction (missing or invalid 'to' address). Please try again or contact support."
+                    );
+                }
+                try {
+                    await ethereumProvider.request({
+                        method: "wallet_switchEthereumChain",
+                        params: [{ chainId: `0x${Number(payload?.chainId ?? 0).toString(16)}` }],
+                    });
+                } catch (e) {
+                    console.warn("Chain switch failed", e);
+                }
+                const accounts = (await ethereumProvider.request({
+                    method: "eth_requestAccounts",
+                })) as string[];
+                const from = accounts?.[0];
+                const txParams: { to: string; data: string; value: string; from?: string } = {
+                    to,
+                    data: txData,
+                    value:
+                        typeof payload?.value === "string"
+                            ? payload.value
+                            : typeof payload?.value === "number"
+                                ? `0x${payload.value.toString(16)}`
+                                : "0x0",
+                };
+                if (from) txParams.from = from;
+                const txHash = (await ethereumProvider.request({
+                    method: "eth_sendTransaction",
+                    params: [txParams],
+                })) as string;
+                if (txHash && data.data.executionId) {
+                    const token2 = await getPrivyAccessToken();
+                    if (token2) {
+                        await fetch(`${buildApiUrl("/executions")}/${data.data.executionId}/report-client-tx`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Authorization: `Bearer ${token2}`,
+                            },
+                            body: JSON.stringify({ txHash }),
+                        });
+                    }
+                }
             }
 
             setState("success");

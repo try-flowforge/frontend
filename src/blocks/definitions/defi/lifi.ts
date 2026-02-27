@@ -5,9 +5,10 @@ import {
 } from "@/types/swap";
 
 /**
- * LI.FI Swap Block Definition
- * Allows users to perform same-chain and cross-chain swaps via LI.FI
- * Supports: Arbitrum, Base (cross-chain between them)
+ * Cross-Chain Swap Node Definition (Powered by LI.FI)
+ *
+ * Supports cross-chain swaps and bridging using LI.FI's aggregation.
+ * Supports: Arbitrum (cross-chain)
  */
 export const lifiBlock: BlockDefinition = {
     id: "lifi",

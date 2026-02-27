@@ -131,6 +131,54 @@ export const useCreateSafeWallet = () => {
 
       const data = await response.json();
 
+      // Mainnet: backend returned payload for client submission (user pays gas)
+      if (data.success && data.data?.submitOnClient && data.data?.payload && ethereumProvider) {
+        const { payload } = data.data;
+        try {
+          await ethereumProvider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+          });
+        } catch (e) {
+          console.warn("Chain switch failed", e);
+        }
+        const txHash = (await ethereumProvider.request({
+          method: "eth_sendTransaction",
+          params: [{
+            to: payload.to,
+            data: payload.data,
+            value: payload.value || "0x0",
+          }],
+        })) as string;
+        if (!txHash) {
+          return {
+            success: false,
+            safeAddress: null,
+            error: "Transaction was not submitted",
+          };
+        }
+        const syncRes = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.RELAY.SYNC_SAFE_FROM_TX), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ chainId: payload.chainId, txHash }),
+        });
+        const syncData = await syncRes.json();
+        if (!syncRes.ok || !syncData.success || !syncData.data?.safeAddress) {
+          return {
+            success: false,
+            safeAddress: null,
+            error: syncData.error || "Safe created but failed to sync address. You may need to refresh.",
+          };
+        }
+        return {
+          success: true,
+          safeAddress: syncData.data.safeAddress,
+        };
+      }
+
       if (!data.success || !data.data?.safeAddress) {
         return {
           success: false,
@@ -453,6 +501,40 @@ export const useCreateSafeWallet = () => {
       }
 
       const data = await response.json();
+
+      // Mainnet: backend returned payload for client submission (user pays gas)
+      if (data.success && data.data?.submitOnClient && data.data?.payload && ethereumProvider) {
+        const { payload } = data.data;
+        try {
+          await ethereumProvider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+          });
+        } catch (e) {
+          console.warn("Chain switch failed", e);
+        }
+        const txHash = (await ethereumProvider.request({
+          method: "eth_sendTransaction",
+          params: [{
+            to: payload.to,
+            data: payload.data,
+            value: payload.value || "0x0",
+          }],
+        })) as string;
+        signedTxRef.current = null;
+        if (!txHash) {
+          return { success: false, error: "Transaction was not submitted" };
+        }
+        return {
+          success: true,
+          data: {
+            status: "executed",
+            threshold,
+            owners,
+            transactionHash: txHash,
+          },
+        };
+      }
 
       if (!data.success || !data.data?.txHash) {
         return {

@@ -111,7 +111,7 @@ function encodeFunctionData(funcName: 'allowance' | 'approve' | 'balanceOf', arg
  * 
  * Allows users to configure token swaps with:
  * - Network from user menu (read-only, automatically synced)
- * - Provider selection (Uniswap, 1inch, Relay - set by block type)
+ * - Provider selection (Uniswap, LiFi - set by block type)
  * - Token pair selection (source and destination)
  * - Amount input with token decimals handling
  * - Swap type locked to EXACT_INPUT
@@ -139,7 +139,7 @@ export function SwapNodeConfiguration({
     const swapProvider =
         forcedProvider ||
         (nodeData.swapProvider as SwapProvider) ||
-        SwapProvider.UNISWAP;
+        SwapProvider.UNISWAP_V4;
 
     // Convert chainId to chain string
     const getChainFromChainId = useCallback((cid: number | null | string): string => {
@@ -653,7 +653,50 @@ export function SwapNodeConfiguration({
                 }
 
                 const result = executeData.data;
-                //console.log("Swap executed successfully:", result.txHash);
+
+                // Mainnet: backend returned payload for client submission (user pays gas)
+                if (result?.submitOnClient && result?.payload && ethereumProvider) {
+                    const { payload, swapExecutionId } = result;
+                    try {
+                        await ethereumProvider.request({
+                            method: 'wallet_switchEthereumChain',
+                            params: [{ chainId: `0x${Number(payload.chainId).toString(16)}` }],
+                        });
+                    } catch (e) {
+                        console.warn('Chain switch failed', e);
+                    }
+                    const txHash = await ethereumProvider.request({
+                        method: 'eth_sendTransaction',
+                        params: [{
+                            to: payload.to,
+                            data: payload.data,
+                            value: payload.value || '0x0',
+                        }],
+                    }) as string;
+                    if (swapExecutionId && txHash) {
+                        await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.SWAP.REPORT_CLIENT_TX), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${accessToken}`,
+                            },
+                            body: JSON.stringify({ swapExecutionId, txHash }),
+                        });
+                    }
+                    setExecutionState({
+                        loading: false,
+                        error: null,
+                        txHash: txHash || null,
+                        approvalTxHash: needsApproval ? "multicall" : null,
+                        success: true,
+                        step: 'done',
+                    });
+                    handleDataChange({
+                        lastTxHash: txHash,
+                        lastExecutedAt: new Date().toISOString(),
+                    });
+                    return;
+                }
 
                 setExecutionState({
                     loading: false,

@@ -101,6 +101,61 @@ export function ExecutionTransactionSigner({ executionId }: { executionId: strin
         throw new Error(payload?.error || "Failed to submit signature.");
       }
 
+      // Mainnet: backend returned payload for client submission (user pays gas)
+      if (payload?.data?.submitOnClient && payload?.data?.payload && ethereumProvider) {
+        const { payload: txPayload } = payload.data;
+        const to = txPayload?.to;
+        const data = txPayload?.data;
+        const chainId = txPayload?.chainId;
+        const isValidAddress =
+          typeof to === "string" && to.startsWith("0x") && to.length === 42;
+        if (!to || !data || !isValidAddress) {
+          throw new Error(
+            "Invalid parameters: the server did not return a valid transaction (missing or invalid 'to' address). Please try again or contact support."
+          );
+        }
+        try {
+          await ethereumProvider.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: `0x${Number(chainId ?? 0).toString(16)}` }],
+          });
+        } catch (e) {
+          console.warn("Chain switch failed", e);
+        }
+        const accounts = (await ethereumProvider.request({
+          method: "eth_requestAccounts",
+        })) as string[];
+        const from = accounts?.[0];
+        const txParams: { to: string; data: string; value: string; from?: string } = {
+          to,
+          data,
+          value:
+            typeof txPayload.value === "string"
+              ? txPayload.value
+              : typeof txPayload.value === "number"
+                ? `0x${txPayload.value.toString(16)}`
+                : "0x0",
+        };
+        if (from) txParams.from = from;
+        const txHash = (await ethereumProvider.request({
+          method: "eth_sendTransaction",
+          params: [txParams],
+        })) as string;
+        if (txHash && payload.data.executionId) {
+          const token2 = await getPrivyAccessToken();
+          if (token2) {
+            await fetch(`${buildApiUrl("/executions")}/${payload.data.executionId}/report-client-tx`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token2}`,
+              },
+              body: JSON.stringify({ txHash }),
+            });
+          }
+        }
+      }
+
       setExecution((prev) =>
         prev
           ? {

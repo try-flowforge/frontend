@@ -1,27 +1,32 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { usePrivy } from '@privy-io/react-auth';
+import { usePrivy, useLinkAccount, useCreateWallet, useWallets } from '@privy-io/react-auth';
 import { usePrivyWallet } from '@/hooks/usePrivyWallet';
-import { useEnsSubdomain } from '@/hooks/useEnsSubdomain';
-import { getAllChains, ChainInfo, getChain } from '@/web3/config/chain-registry';
-import { Avatar } from './Avatar';
-import { ClaimEnsSubdomainModal } from '../ens/ClaimEnsSubdomainModal';
-import { Switch } from './Switch';
-import { CopyButton } from '../ui/CopyButton';
+import { ChainInfo, getChain } from '@/web3/config/chain-registry';
+import { useOnboarding } from '@/onboarding/context/OnboardingContext';
+import { Avatar } from "./Avatar";
+import { CopyButton } from "../ui/CopyButton";
 import { generateAvatarGradient } from './avatar-generator';
-import {
-  HiOutlineShieldCheck,
-} from 'react-icons/hi';
+import { HiOutlineShieldCheck } from 'react-icons/hi';
 import { BiLinkExternal } from 'react-icons/bi';
 import { LuLogOut } from 'react-icons/lu';
-import { TbLayoutGrid, TbWorld } from 'react-icons/tb';
+import { TbLayoutGrid } from 'react-icons/tb';
 import { FaEye } from "react-icons/fa6";
-// import { TfiCreditCard } from 'react-icons/tfi';
 import { BiLink } from "react-icons/bi";
+import { FaWallet, FaPlus } from "react-icons/fa";
 import { Button } from '../ui/Button';
 import { API_CONFIG, buildApiUrl } from '@/config/api';
+
+/**
+ * Network family: label + mainnet/testnet chain ids.
+ * When adding Base (or others), add an entry here and make the network name a dropdown
+ * using selectedFamilyIndex; the rest (mainnet/testnet toggle + Safe/Setup) stays the same.
+ */
+const NETWORK_FAMILIES: { label: string; mainnetId: string; testnetId: string }[] = [
+  { label: "Arbitrum", mainnetId: "ARBITRUM", testnetId: "ARBITRUM_SEPOLIA" },
+];
 
 interface UserProfile {
   id: string;
@@ -34,13 +39,39 @@ interface UserProfile {
 export function UserMenu() {
   const { user, logout } = usePrivy();
   const { wallet: embeddedWallet, chainId, walletAddress, getPrivyAccessToken } = usePrivyWallet();
-  const { subdomains, listSubdomains, loading: ensLoading } = useEnsSubdomain();
+  const { wallets = [], ready: walletsReady } = useWallets();
+  const { linkWallet } = useLinkAccount({ onSuccess: () => setIsOpen(false) });
+  const { createWallet } = useCreateWallet();
+  const { openSetupWizard } = useOnboarding();
+
+  const hasLinkedWallet = (wallets as { linked?: boolean; walletClientType?: string }[]).filter(
+    (w) => w.linked || w.walletClientType === 'privy'
+  ).length > 0;
   const [isOpen, setIsOpen] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [claimEnsOpen, setClaimEnsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Network configurations
+  // Selected network family (0 = Arbitrum; later dropdown for Base etc.)
+  const [selectedFamilyIndex, setSelectedFamilyIndex] = useState(0);
+  // Mainnet (true) vs Testnet (false) — two-way toggle like theme switcher
+  const [isMainnet, setIsMainnet] = useState(true);
+
+  const family = NETWORK_FAMILIES[selectedFamilyIndex];
+  const mainnetChain = family ? getChain(family.mainnetId) : undefined;
+  const testnetChain = family ? getChain(family.testnetId) : undefined;
+  const activeChain: ChainInfo | undefined = useMemo(
+    () => (isMainnet ? mainnetChain : testnetChain),
+    [isMainnet, mainnetChain, testnetChain]
+  );
+
+  // Sync mainnet/testnet toggle from current wallet chain when menu opens or chain changes
+  useEffect(() => {
+    if (!mainnetChain || !testnetChain || chainId === undefined || !isOpen) return;
+    const current = getChain(chainId);
+    if (current?.id === mainnetChain.id) setIsMainnet(true);
+    else if (current?.id === testnetChain.id) setIsMainnet(false);
+  }, [chainId, mainnetChain, testnetChain, isOpen]);
+
   const currentInternalId = getChain(chainId)?.id;
 
   // Get email (may be undefined)
@@ -85,34 +116,46 @@ export function UserMenu() {
     }
   }, [getPrivyAccessToken]);
 
-  // Only fetch profile and subdomains when user has a linked wallet (backend returns 401 otherwise)
+  // Fetch profile when menu opens (user has linked wallet; backend returns 401 otherwise)
   useEffect(() => {
     if (isOpen && walletAddress) {
       fetchProfile();
-      getPrivyAccessToken().then((token) => {
-        if (token) listSubdomains(token);
-      });
     }
-  }, [isOpen, walletAddress, fetchProfile, getPrivyAccessToken, listSubdomains]);
+  }, [isOpen, walletAddress, fetchProfile]);
+
+  // Refetch profile when onboarding setup completes (e.g. existing Safe synced or new one created)
+  useEffect(() => {
+    const onInvalidate = () => {
+      if (walletAddress) fetchProfile();
+    };
+    window.addEventListener("flowforge:profile-invalidate", onInvalidate);
+    return () => window.removeEventListener("flowforge:profile-invalidate", onInvalidate);
+  }, [walletAddress, fetchProfile]);
 
   // Early return AFTER all hooks
   if (!email) return null;
 
-  const handleNetworkSwitch = async (identifier: string | number) => {
+  const handleNetworkSwitch = async (targetChain: ChainInfo) => {
     try {
-      if (!embeddedWallet) {
-        throw new Error('Embedded wallet not found');
-      }
-
-      const targetChain = getChain(identifier);
-      if (!targetChain) return;
-
+      if (!embeddedWallet) return;
       if (currentInternalId === targetChain.id) return;
-
       await embeddedWallet.switchChain(targetChain.chainId);
     } catch {
-      // console.error('Failed to switch chain:', error);
+      // ignore
     }
+  };
+
+  const handleMainnetTestnetToggle = (useMainnet: boolean) => {
+    const chain = useMainnet ? mainnetChain : testnetChain;
+    if (!chain) return;
+    setIsMainnet(useMainnet);
+    handleNetworkSwitch(chain);
+  };
+
+  const handleSetupOnChain = () => {
+    if (!activeChain) return;
+    openSetupWizard([activeChain]);
+    setIsOpen(false);
   };
 
   return (
@@ -144,48 +187,41 @@ export function UserMenu() {
                 <div className="w-full items-center justify-between px-3 py-2 bg-white/10 rounded-lg text-sm text-white/70 truncate">
                   {email}
                 </div>
-              </div>
-
-              {/* Sponsored txs (mainnet) */}
-              {typeof profile?.remaining_sponsored_txs === 'number' && (
-                <div className="w-full px-3 py-2 rounded-lg bg-white/10 text-sm text-white/80">
-                  <span className="text-white/50">Sponsored txs (mainnet): </span>
-                  <span className="font-medium">{profile.remaining_sponsored_txs}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ENS subdomains & Claim */}
-          <div className="py-2 border-t border-white/20">
-            <div className="px-4 py-2 flex items-center gap-2">
-              <TbWorld className="shrink-0 w-4 h-4 text-white/30" />
-              <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">ENS</span>
-            </div>
-            {ensLoading ? (
-              <div className="px-4 py-2 text-xs text-white/50">Loading…</div>
-            ) : subdomains.length > 0 ? (
-              <div className="px-4 py-2 space-y-1">
-                {subdomains.slice(0, 3).map((s) => (
-                  <div key={s.id} className="text-xs text-white/70 truncate" title={s.ens_name}>
-                    {s.active ? (
-                      <span className="text-green-400/90">{s.ens_name}</span>
-                    ) : (
-                      <span className="text-white/50">{s.ens_name} (expired)</span>
-                    )}
+                {/* Connect wallet when none linked */}
+                {!hasLinkedWallet && (
+                  <div className="w-full space-y-2 pt-1">
+                    <p className="text-xs text-amber-400/90">No wallet linked. Connect one to use Safe and workflows.</p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => { linkWallet(); setIsOpen(false); }}
+                        disabled={!walletsReady}
+                        className="flex-1 gap-2 text-sm"
+                      >
+                        <FaWallet className="w-3.5 h-3.5" />
+                        Connect wallet
+                      </Button>
+                      <Button
+                        onClick={async () => {
+                          try {
+                            await createWallet();
+                            setIsOpen(false);
+                          } catch { /* no-op */ }
+                        }}
+                        disabled={!walletsReady}
+                        className="flex-1 gap-2 text-sm bg-transparent hover:bg-white/5"
+                      >
+                        <FaPlus className="w-3.5 h-3.5" />
+                        Create wallet
+                      </Button>
+                    </div>
                   </div>
-                ))}
+                )}
               </div>
-            ) : null}
-            <div className="px-2 pt-1">
-              <Button
-                onClick={() => { setClaimEnsOpen(true); setIsOpen(false); }}
-                className="w-full text-sm"
-              >
-                Claim subdomain
-              </Button>
+
             </div>
           </div>
+
+
 
           {/* Plan & Billing */}
           {/* <div className="py-2">
@@ -203,50 +239,76 @@ export function UserMenu() {
           {/* Divider */}
           <div className="border-t border-white/20" />
 
-          {/* Network Selector */}
+          {/* Network: name + mainnet/testnet toggle + Safe address or Setup */}
           <div className="py-2">
             <div className="px-4 py-2 flex items-center gap-2">
               <BiLink className="shrink-0 w-4 h-4 text-white/30" />
               <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Networks</span>
             </div>
 
-            {/* Dynamic Network Selector */}
-            {getAllChains().map((chain: ChainInfo) => {
-              const safeAddress = profile?.safe_wallets?.[String(chain.chainId)];
-
-              return (
-                <div key={chain.id} className="w-full px-4 py-2 space-y-1">
-                  <div className="flex items-center gap-3 text-sm font-medium text-white/70">
-                    <span className="flex-1">{chain.name}</span>
-                    <Switch
-                      checked={currentInternalId === chain.id}
-                      onCheckedChange={(checked) => {
-                        if (checked) handleNetworkSwitch(chain.id);
-                      }}
-                      gradient={gradient}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 pl-1">
-                    <div className="text-[10px] font-mono text-white/30 truncate flex-1">
-                      {safeAddress ? (
-                        <span className="flex items-center gap-1">
-                          <HiOutlineShieldCheck className="w-3 h-3 text-white/20" />
-                          {safeAddress}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 opacity-50">
-                          <HiOutlineShieldCheck className="w-3 h-3" />
-                          -
-                        </span>
-                      )}
-                    </div>
-                    {safeAddress && (
-                      <CopyButton text={safeAddress} size="sm" />
-                    )}
-                  </div>
+            {family && mainnetChain && testnetChain && activeChain && (
+              <div className="w-full px-4 py-2 space-y-3">
+                {/* Network name (later: dropdown when multiple families) */}
+                <div className="text-sm font-medium text-white/90">
+                  {family.label}
                 </div>
-              );
-            })}
+
+                {/* Sliding toggle: Mainnet | Testnet */}
+                <div className="relative flex rounded-lg bg-white/10 border border-white/10 p-0.5">
+                  {/* Sliding pill */}
+                  <div
+                    className="absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] rounded-md bg-white/20 shadow transition-[transform] duration-200 ease-out left-0.5"
+                    style={{ transform: isMainnet ? "translateX(0)" : "translateX(100%)" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleMainnetTestnetToggle(true)}
+                    className={`relative z-10 flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
+                      isMainnet ? "text-white" : "text-white/50 hover:text-white/70"
+                    }`}
+                  >
+                    Mainnet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMainnetTestnetToggle(false)}
+                    className={`relative z-10 flex-1 py-2 px-3 text-xs font-medium rounded-md transition-colors ${
+                      !isMainnet ? "text-white" : "text-white/50 hover:text-white/70"
+                    }`}
+                  >
+                    Testnet
+                  </button>
+                </div>
+
+                {/* Safe address for active chain, or Setup button */}
+                <div className="flex items-center gap-2 min-h-[2rem]">
+                  {(() => {
+                    const safeAddress = profile?.safe_wallets?.[String(activeChain.chainId)];
+                    if (safeAddress) {
+                      return (
+                        <>
+                          <span className="flex items-center gap-1.5 text-[10px] font-mono text-white/30 truncate flex-1">
+                            <HiOutlineShieldCheck className="w-3 h-3 text-white/20 shrink-0" />
+                            {safeAddress}
+                          </span>
+                          <CopyButton text={safeAddress} size="sm" />
+                        </>
+                      );
+                    }
+                    return (
+                      <Button
+                        onClick={handleSetupOnChain}
+                        className="w-full gap-2 text-xs bg-amber-600/20 border-amber-500/30 hover:bg-amber-600/30"
+                        border
+                      >
+                        <HiOutlineShieldCheck className="w-3.5 h-3.5" />
+                        Setup on this chain
+                      </Button>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Divider */}
@@ -296,16 +358,7 @@ export function UserMenu() {
       )
       }
 
-      <ClaimEnsSubdomainModal
-        open={claimEnsOpen}
-        onClose={() => setClaimEnsOpen(false)}
-        onSuccess={() => {
-          getPrivyAccessToken().then((token) => {
-            if (token) listSubdomains(token);
-          });
-          fetchProfile();
-        }}
-      />
+
     </div >
   );
 }

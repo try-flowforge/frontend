@@ -12,11 +12,13 @@ interface Step {
 interface WizardStepperProps {
     steps: Step[];
     currentStepIndex: number;
+    onStepClick?: (stepIndex: number) => void;
 }
 
 export const WizardStepper: React.FC<WizardStepperProps> = ({
     steps,
     currentStepIndex,
+    onStepClick,
 }) => {
     return (
         <div className="flex items-center w-full mb-8">
@@ -24,10 +26,27 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({
                 const isCompleted = index < currentStepIndex;
                 const isCurrent = index === currentStepIndex;
                 const isLast = index === steps.length - 1;
+                const canGoToStep = onStepClick && (isCompleted || isCurrent);
 
                 return (
                     <React.Fragment key={step.id}>
-                        <div className="flex flex-col items-center gap-2 relative z-10 shrink-0">
+                        <div
+                            className={`flex flex-col items-center gap-2 relative z-10 shrink-0 ${canGoToStep ? "cursor-pointer" : ""}`}
+                            onClick={canGoToStep ? () => onStepClick(index) : undefined}
+                            onKeyDown={
+                                canGoToStep
+                                    ? (e) => {
+                                          if (e.key === "Enter" || e.key === " ") {
+                                              e.preventDefault();
+                                              onStepClick(index);
+                                          }
+                                      }
+                                    : undefined
+                            }
+                            role={canGoToStep ? "button" : undefined}
+                            tabIndex={canGoToStep ? 0 : undefined}
+                            aria-label={canGoToStep ? `Go to step: ${step.label}` : undefined}
+                        >
                             <motion.div
                                 className={`
                                     w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors
