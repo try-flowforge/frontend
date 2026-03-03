@@ -474,6 +474,7 @@ export function WorkflowDashboard() {
                             onEdit={() => handleEdit(workflow.id)}
                             onDelete={() => handleDelete(workflow.id)}
                             onRun={() => handleRun(workflow.id)}
+                            getAccessToken={getPrivyAccessToken}
                         />
                     ))}
                 </div>

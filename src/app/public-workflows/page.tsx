@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import NavBar from "@/components/layout/Navbar";
 import { PublicWorkflowsGallery } from "@/components/workspace/public-workflows/PublicWorkflowsGallery";
+import { WorkflowProvider } from "@/context/WorkflowContext";
 
 export const metadata: Metadata = {
     title: "Public Workflows - FlowForge",
@@ -12,7 +13,9 @@ export default function PublicWorkflowsPage() {
     return (
         <div className="min-h-screen bg-background">
             <NavBar />
-            <PublicWorkflowsGallery />
+            <WorkflowProvider>
+                <PublicWorkflowsGallery />
+            </WorkflowProvider>
         </div>
     );
 }

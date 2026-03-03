@@ -15,17 +15,8 @@ import {
 } from "@/utils/workflow-api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import {
-  ReactFlow,
-  ReactFlowProvider,
-  Background,
-  BackgroundVariant,
-  Node,
-  Edge,
-} from "reactflow";
-import "reactflow/dist/style.css";
-import { nodeTypes } from "../nodeTypes";
-import { PREVIEW_EDGE_OPTIONS, PREVIEW_BACKGROUND_CONFIG } from "@/constants/workflow";
+import { ReactFlowProvider, type Node, type Edge } from "reactflow";
+import { WorkflowPreviewCanvas } from "./WorkflowPreviewCanvas";
 import type { PublicWorkflowDetail } from "@/types/workflow";
 import { PublicVersionSelector } from "./PublicVersionSelector";
 
@@ -214,7 +205,7 @@ function PublicWorkflowPreviewInner({ workflowId }: PublicWorkflowPreviewProps) 
       {/* Header */}
       <Card className="rounded-none border-x-0 border-t-0">
         <div className="px-4 sm:px-6 lg:px-8 py-4">
-          <div className="max-w-7xl mx-auto">
+          <div className="mx-auto">
             <div className="flex items-center gap-4 mb-4">
               <Button onClick={handleBack} className="gap-2">
                 <LuArrowLeft className="w-4 h-4" />
@@ -244,7 +235,7 @@ function PublicWorkflowPreviewInner({ workflowId }: PublicWorkflowPreviewProps) 
                 <Button
                   onClick={handleUseWorkflow}
                   disabled={isCloning}
-                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 gap-2"
+                  className="bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-600 over:to-orange-600 gap-2"
                 >
                   {isCloning ? (
                     <>
@@ -296,29 +287,7 @@ function PublicWorkflowPreviewInner({ workflowId }: PublicWorkflowPreviewProps) 
                 </div>
               </div>
             )}
-            <ReactFlow
-              nodes={versionNodes}
-              edges={versionEdges}
-              nodeTypes={nodeTypes}
-              fitView
-              nodesDraggable={false}
-              nodesConnectable={false}
-              elementsSelectable={false}
-              nodesFocusable={false}
-              edgesFocusable={false}
-              zoomOnScroll={true}
-              zoomOnPinch={true}
-              panOnScroll={false}
-              panOnDrag={true}
-              defaultEdgeOptions={PREVIEW_EDGE_OPTIONS}
-            >
-              <Background
-                variant={BackgroundVariant.Dots}
-                gap={PREVIEW_BACKGROUND_CONFIG.gap}
-                size={PREVIEW_BACKGROUND_CONFIG.size}
-                color={PREVIEW_BACKGROUND_CONFIG.color}
-              />
-            </ReactFlow>
+            <WorkflowPreviewCanvas nodes={versionNodes} edges={versionEdges} />
           </div>
         </div>
       </div>
