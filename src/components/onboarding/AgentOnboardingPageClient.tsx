@@ -8,6 +8,7 @@ import {
   LuCheck,
   LuChevronRight,
   LuLock,
+  LuShield,
   LuWallet,
 } from "react-icons/lu";
 import { Typography } from "@/components/ui/Typography";
@@ -18,8 +19,9 @@ import { TelegramNodeConfiguration } from "@/blocks/configs/social/telegram/Tele
 import { useSearchParams } from "next/navigation";
 import { TransactionSigner } from "./TransactionSigner";
 import { ExecutionTransactionSigner } from "./ExecutionTransactionSigner";
+import { SpendingPolicyStep } from "./SpendingPolicyStep";
 
-type OnboardingStep = 1 | 2;
+type OnboardingStep = 1 | 2 | 3;
 
 export default function AgentOnboardingPageClient() {
   const searchParams = useSearchParams();
@@ -46,8 +48,10 @@ export default function AgentOnboardingPageClient() {
   const [telegramNodeData, setTelegramNodeData] = useState<Record<string, unknown>>(
     () => ({ id: "agent-onboarding-telegram", telegramMessage: "" }),
   );
+  const [spendingPolicyDone, setSpendingPolicyDone] = useState(false);
 
   const [step, setStep] = useState<OnboardingStep>(1);
+  const isTelegramConnected = Boolean(telegramNodeData.telegramConnectionId);
 
   const steps = useMemo(
     () =>
@@ -65,11 +69,19 @@ export default function AgentOnboardingPageClient() {
           title: "Connect Telegram",
           description: "Link a chat to interact with the agent",
           icon: LuBot,
-          isComplete: false,
+          isComplete: isTelegramConnected,
           isLocked: !isWalletConnected,
         },
+        {
+          id: 3 as const,
+          title: "Set Spending Permissions",
+          description: "Sign once to allow auto-execution within limits",
+          icon: LuShield,
+          isComplete: spendingPolicyDone,
+          isLocked: !isWalletConnected || !isTelegramConnected,
+        },
       ] as const,
-    [isWalletConnected],
+    [isTelegramConnected, isWalletConnected, spendingPolicyDone],
   );
 
   const activeStep = steps.find((s) => s.id === step) ?? steps[0];
@@ -207,7 +219,7 @@ export default function AgentOnboardingPageClient() {
             <div className="space-y-3 border-b border-white/10 pb-3">
               <div className="flex items-center justify-between gap-3">
                 <Typography variant="caption" className="text-muted-foreground">
-                  Step {step} of 2
+                  Step {step} of 3
                 </Typography>
                 {activeStep.id === 1 && isWalletConnected && (
                   <Button onClick={() => setStep(2)}>
@@ -215,15 +227,27 @@ export default function AgentOnboardingPageClient() {
                     <LuChevronRight className="h-4 w-4" />
                   </Button>
                 )}
+                {activeStep.id === 2 && isTelegramConnected && (
+                  <Button onClick={() => setStep(3)}>
+                    Next
+                    <LuChevronRight className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
               <div className="space-y-1">
                 <Typography variant="h4" className="text-foreground">
-                  {activeStep.id === 1 ? "Connect Wallet & Onboard" : "Connect Telegram"}
+                  {activeStep.id === 1
+                    ? "Connect Wallet & Onboard"
+                    : activeStep.id === 2
+                      ? "Connect Telegram"
+                      : "Set Spending Permissions"}
                 </Typography>
                 <Typography variant="caption" className="text-muted-foreground block">
                   {activeStep.id === 1
                     ? "Create/enable your Safe setup to power secure executions."
-                    : "Verify and connect a Telegram chat for direct agent interaction."}
+                    : activeStep.id === 2
+                      ? "Verify and connect a Telegram chat for direct agent interaction."
+                      : "Configure per-transaction and daily limits for auto execution."}
                 </Typography>
               </div>
             </div>
@@ -259,10 +283,54 @@ export default function AgentOnboardingPageClient() {
                   <WalletNodeConfiguration />
                 </div>
               )
-            ) : !isSignedIn ? (
+            ) : step === 2 ? (
+              !isSignedIn ? (
               <SimpleCard className="p-6 rounded-2xl border-white/10">
                 <Typography variant="caption" className="text-muted-foreground mt-1 block">
                   Sign in to continue. Telegram linking uses your authenticated session.
+                </Typography>
+                <div className="pt-3">
+                  <Button
+                    disabled={!ready}
+                    onClick={() => {
+                      setStep(1);
+                      login({ loginMethods: ["email"] });
+                    }}
+                  >
+                    <BiLogInCircle className="w-4 h-4" />
+                    <span>Sign In</span>
+                  </Button>
+                </div>
+              </SimpleCard>
+              ) : !hasLinkedWallet ? (
+              <SimpleCard className="p-6 rounded-2xl border-white/10">
+                <Typography variant="bodySmall" className="font-semibold text-foreground">
+                  Wallet connection required
+                </Typography>
+                <Typography variant="caption" className="text-muted-foreground mt-1 block">
+                  Connect your wallet in Step 1 before linking Telegram.
+                </Typography>
+                <div className="pt-3">
+                  <Button onClick={() => setStep(1)}>
+                    Go to Step 1
+                    <LuChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </SimpleCard>
+              ) : (
+              <TelegramNodeConfiguration
+                nodeData={telegramNodeData}
+                handleDataChange={(updates) =>
+                  setTelegramNodeData((prev) => ({ ...prev, ...updates }))
+                }
+                authenticated={authenticated}
+                login={() => login({ loginMethods: ["email"] })}
+              />
+              )
+            ) : !isSignedIn ? (
+              <SimpleCard className="p-6 rounded-2xl border-white/10">
+                <Typography variant="caption" className="text-muted-foreground mt-1 block">
+                  Sign in to configure spending permissions.
                 </Typography>
                 <div className="pt-3">
                   <Button
@@ -283,7 +351,7 @@ export default function AgentOnboardingPageClient() {
                   Wallet connection required
                 </Typography>
                 <Typography variant="caption" className="text-muted-foreground mt-1 block">
-                  Connect your wallet in Step 1 before linking Telegram.
+                  Connect your wallet in Step 1 before setting permissions.
                 </Typography>
                 <div className="pt-3">
                   <Button onClick={() => setStep(1)}>
@@ -292,15 +360,23 @@ export default function AgentOnboardingPageClient() {
                   </Button>
                 </div>
               </SimpleCard>
+            ) : !isTelegramConnected ? (
+              <SimpleCard className="p-6 rounded-2xl border-white/10">
+                <Typography variant="bodySmall" className="font-semibold text-foreground">
+                  Telegram connection required
+                </Typography>
+                <Typography variant="caption" className="text-muted-foreground mt-1 block">
+                  Complete Step 2 before setting spending permissions.
+                </Typography>
+                <div className="pt-3">
+                  <Button onClick={() => setStep(2)}>
+                    Go to Step 2
+                    <LuChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </SimpleCard>
             ) : (
-              <TelegramNodeConfiguration
-                nodeData={telegramNodeData}
-                handleDataChange={(updates) =>
-                  setTelegramNodeData((prev) => ({ ...prev, ...updates }))
-                }
-                authenticated={authenticated}
-                login={() => login({ loginMethods: ["email"] })}
-              />
+              <SpendingPolicyStep onCompleted={() => setSpendingPolicyDone(true)} />
             )}
           </div>
         </div>

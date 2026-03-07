@@ -15,8 +15,16 @@ interface BackendRuntimeConfig {
   timestamp: string;
 }
 
-// Fetch backend runtime configuration
+// In-memory cache to avoid bombarding backend when multiple consumers fetch on sign-in
+let runtimeConfigCache: { data: BackendRuntimeConfig; until: number } | null = null;
+const RUNTIME_CONFIG_CACHE_MS = 30_000;
+
+// Fetch backend runtime configuration (cached for a short period)
 export async function fetchBackendRuntimeConfig(): Promise<BackendRuntimeConfig> {
+  const now = Date.now();
+  if (runtimeConfigCache && runtimeConfigCache.until > now) {
+    return runtimeConfigCache.data;
+  }
   const response = await fetch(
     buildApiUrl(API_CONFIG.ENDPOINTS.META.RUNTIME_CONFIG),
   );
@@ -31,7 +39,9 @@ export async function fetchBackendRuntimeConfig(): Promise<BackendRuntimeConfig>
     throw new Error("Invalid runtime config response");
   }
 
-  return data.data;
+  const result = data.data as BackendRuntimeConfig;
+  runtimeConfigCache = { data: result, until: now + RUNTIME_CONFIG_CACHE_MS };
+  return result;
 }
 
 export function getOnboardingChains(): ChainInfo[] {
@@ -44,7 +54,8 @@ export async function validateAndGetOnboardingChains(): Promise<{
   backendConfig: BackendRuntimeConfig;
 }> {
   const backendConfig = await fetchBackendRuntimeConfig();
-  const chains = getOnboardingChains();
+  const activeSet = new Set(backendConfig.activeChains ?? []);
+  const chains = getAllChains().filter((c) => activeSet.has(c.chainId));
 
   return { chains, backendConfig };
 }

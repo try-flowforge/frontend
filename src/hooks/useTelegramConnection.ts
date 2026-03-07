@@ -41,7 +41,7 @@ interface UseTelegramConnectionReturn {
     actions: {
         loadBotInfo: () => Promise<void>;
         loadChats: () => Promise<void>;
-        loadConnections: () => Promise<void>;
+        loadConnections: () => Promise<TelegramConnection[] | undefined>;
         saveConnection: (chat: TelegramChat) => Promise<void>;
         deleteConnection: (connectionId: string) => Promise<void>;
         sendPreviewMessage: () => Promise<void>;
@@ -172,12 +172,12 @@ export function useTelegramConnection({
         }
     }, [getPrivyAccessToken, showNotification, clearNotification]);
 
-    // Load user's connections
-    const loadConnections = useCallback(async () => {
+    // Load user's connections. Returns the connections array when successful (for callers that need to pick one).
+    const loadConnections = useCallback(async (): Promise<TelegramConnection[] | undefined> => {
         setLoading((prev) => ({ ...prev, connections: true }));
         try {
             const accessToken = await getPrivyAccessToken();
-            if (!accessToken) return;
+            if (!accessToken) return undefined;
 
             const response = await fetch(
                 buildApiUrl(API_CONFIG.ENDPOINTS.TELEGRAM.CONNECTIONS),
@@ -186,20 +186,24 @@ export function useTelegramConnection({
 
             if (response.ok) {
                 const data = await response.json();
-                setConnections(data.data.connections || []);
+                const list = data.data.connections || [];
+                setConnections(list);
 
                 // Auto-select if nodeData has a connection
                 if (nodeData.telegramConnectionId) {
-                    const conn = data.data.connections.find(
+                    const conn = list.find(
                         (c: TelegramConnection) => c.id === nodeData.telegramConnectionId
                     );
                     if (conn) {
                         setSelectedConnection(conn);
                     }
                 }
+                return list;
             }
+            return undefined;
         } catch {
             // console.error("Failed to load connections:", error);
+            return undefined;
         } finally {
             setLoading((prev) => ({ ...prev, connections: false }));
         }
@@ -417,11 +421,26 @@ export function useTelegramConnection({
                 const data = await response.json();
                 setVerificationStatus(data.data);
 
-                // If verified, reload connections and show success
+                // If verified, reload connections, auto-select the new connection, and show success
                 if (data.data.status === 'verified') {
                     showNotification("success", `✅ Chat "${data.data.chat?.title}" verified and connected!`);
                     setVerificationCode(null); // Clear the code display
-                    await loadConnections();
+                    const connections = await loadConnections();
+                    const verifiedChat = data.data.chat;
+                    if (verifiedChat && connections?.length) {
+                        const connection = connections.find(
+                            (c) => String(c.chatId) === String(verifiedChat.id) || c.chatTitle === verifiedChat.title
+                        );
+                        if (connection) {
+                            setSelectedConnection(connection);
+                            onDataChange({
+                                telegramConnectionId: connection.id,
+                                telegramChatId: connection.chatId,
+                                telegramChatTitle: connection.chatTitle,
+                                telegramChatType: connection.chatType,
+                            });
+                        }
+                    }
                 } else if (data.data.status === 'expired') {
                     showNotification("info", "Verification code expired. Generate a new one.");
                     setVerificationCode(null);
@@ -432,7 +451,7 @@ export function useTelegramConnection({
         } finally {
             setLoading((prev) => ({ ...prev, verification: false }));
         }
-    }, [getPrivyAccessToken, showNotification, loadConnections]);
+    }, [getPrivyAccessToken, showNotification, loadConnections, onDataChange]);
 
     // Cancel pending verification code
     const cancelVerificationCode = useCallback(async () => {

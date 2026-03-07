@@ -134,6 +134,18 @@ export const useCreateSafeWallet = () => {
       // Mainnet: backend returned payload for client submission (user pays gas)
       if (data.success && data.data?.submitOnClient && data.data?.payload && ethereumProvider) {
         const { payload } = data.data;
+        const toAddress = payload?.to;
+        const isValidAddress =
+          typeof toAddress === "string" &&
+          /^0x[a-fA-F0-9]{40}$/.test(toAddress);
+        if (!isValidAddress) {
+          return {
+            success: false,
+            safeAddress: null,
+            error:
+              "Invalid create-safe response: missing or invalid factory address. Please try again.",
+          };
+        }
         try {
           await ethereumProvider.request({
             method: "wallet_switchEthereumChain",
@@ -142,13 +154,28 @@ export const useCreateSafeWallet = () => {
         } catch (e) {
           console.warn("Chain switch failed", e);
         }
+        // No ETH is sent; createSafeWallet is a pure contract call.
+        const valueHex = "0x0";
+        const txParams: Record<string, string> = {
+          to: toAddress,
+          data: payload.data ?? "0x",
+          value: valueHex,
+        };
+        const accounts = (await ethereumProvider.request({
+          method: "eth_accounts",
+          params: [],
+        })) as string[] | undefined;
+        if (accounts?.[0]) {
+          txParams.from = accounts[0];
+        }
+        // Provide explicit gasLimit so the wallet does not use eth_estimateGas. When
+        // estimation fails (e.g. on Arbitrum), some wallets fall back to block gas
+        // limit and show a huge incorrect cost (e.g. thousands of ETH).
+        const CREATE_SAFE_GAS_LIMIT = 600_000;
+        txParams.gasLimit = "0x" + CREATE_SAFE_GAS_LIMIT.toString(16);
         const txHash = (await ethereumProvider.request({
           method: "eth_sendTransaction",
-          params: [{
-            to: payload.to,
-            data: payload.data,
-            value: payload.value || "0x0",
-          }],
+          params: [txParams],
         })) as string;
         if (!txHash) {
           return {
@@ -513,13 +540,21 @@ export const useCreateSafeWallet = () => {
         } catch (e) {
           console.warn("Chain switch failed", e);
         }
+        const txParams: Record<string, string> = {
+          to: payload.to,
+          data: payload.data,
+          value: payload.value || "0x0",
+        };
+        const accounts = (await ethereumProvider.request({
+          method: "eth_accounts",
+          params: [],
+        })) as string[] | undefined;
+        if (accounts?.[0]) {
+          txParams.from = accounts[0];
+        }
         const txHash = (await ethereumProvider.request({
           method: "eth_sendTransaction",
-          params: [{
-            to: payload.to,
-            data: payload.data,
-            value: payload.value || "0x0",
-          }],
+          params: [txParams],
         })) as string;
         signedTxRef.current = null;
         if (!txHash) {

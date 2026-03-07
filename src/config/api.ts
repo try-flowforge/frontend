@@ -74,6 +74,12 @@ export const API_CONFIG = {
       ALLOWANCE_PREPARE: "/ostium/allowance/prepare",
       ALLOWANCE_EXECUTE: "/ostium/allowance/execute",
     },
+    SPENDING_POLICY: {
+      GET: "/spending-policy",
+      UPSERT: "/spending-policy",
+      PREPARE: "/spending-policy/prepare",
+      EXECUTE: "/spending-policy/execute",
+    },
     USERS: {
       ME: "/users/me",
       GET_BY_ADDRESS: "/users/address/:address",

@@ -315,8 +315,13 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                 setIsCheckingUser(true);
             }
             try {
-                const user = await fetchUserData();
+                // Fetch once and reuse to avoid multiple /users/me and /meta/runtime-config calls
+                const [user, chainsResult] = await Promise.all([
+                    fetchUserData(),
+                    validateAndGetOnboardingChains().catch(() => ({ chains: [] as ChainConfig[], backendConfig: null })),
+                ]);
                 if (cancelled) return;
+                const allChains = chainsResult.chains ?? [];
                 setUserRecord(user);
 
                 // Phase 2: Handle Returning User logic (Skip steps if already exists)
@@ -325,7 +330,6 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
                     // Restore chains if they exist
                     if (user.selected_chains && user.selected_chains.length > 0) {
-                        const { chains: allChains } = await validateAndGetOnboardingChains().catch(() => ({ chains: [] }));
                         const restoredChains = allChains.filter(c => user.selected_chains?.includes(c.id));
 
                         if (restoredChains.length > 0) {
@@ -336,7 +340,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     }
                 }
 
-                // Phase 3: Detailed Onboarding Necessity Check
+                // Phase 3: Detailed Onboarding Necessity Check (use allChains from single fetch)
                 const persisted = getStoredState();
                 const isSkipped = persisted.skipped;
                 let hasAnyCompleted = Object.values(persisted.completedChains).some(v => v);
@@ -346,10 +350,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     const newCompleted = { ...persisted.completedChains };
                     let changed = false;
 
-                    // Map numeric chain IDs from backend to our storage keys (chain.id)
-                    const chainsToValidate = chainsToSetup.length > 0 ? chainsToSetup : (await validateAndGetOnboardingChains().catch(() => ({ chains: [] }))).chains;
-
-                    for (const chain of chainsToValidate) {
+                    for (const chain of allChains) {
                         const numericId = String(getChain(chain.chainId)?.chainId || chain.chainId);
                         if (user.safe_wallets[numericId] && !newCompleted[chain.id]) {
                             newCompleted[chain.id] = true;
@@ -370,9 +371,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                     setNeedsOnboarding(true);
                 } else {
                     // Check if any wallets are missing
-                    const chainsToValidate = chainsToSetup.length > 0 ? chainsToSetup : (await validateAndGetOnboardingChains().catch(() => ({ chains: [] }))).chains;
-
-                    const chainsNeedingSetup = chainsToValidate.filter((chain) => {
+                    const chainsNeedingSetup = allChains.filter((chain) => {
                         const c = getChain(chain.chainId);
                         return !user?.safe_wallets?.[String(c?.chainId || chain.chainId)];
                     });
@@ -382,7 +381,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
                         // Pre-fill existing progress
                         setProgress((prev) => {
                             const updated = { ...prev };
-                            for (const chain of chainsToValidate) {
+                            for (const chain of allChains) {
                                 const c = getChain(chain.chainId);
                                 if (user?.safe_wallets?.[String(c?.chainId || chain.chainId)]) {
                                     updated[chain.id] = {
@@ -412,7 +411,8 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
         })();
 
         return () => { cancelled = true; };
-    }, [ready, authenticated, isModeValid, fetchUserData, chainsToSetup]);
+        // Intentionally omit chainsToSetup so setting it inside this effect doesn't re-trigger and re-fetch
+    }, [ready, authenticated, isModeValid, fetchUserData]);
 
     // Validate mode on mount
     useEffect(() => {
@@ -693,8 +693,10 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({
 
         let allSuccessful = true;
 
-        // Process each chain that needs setup
-        for (const chain of chainsToSetup) {
+        // Process mainnet first, then testnet (so user's "create on mainnet" runs before testnet)
+        const chainsOrdered = [...chainsToSetup].sort((a, b) => (a.isTestnet === b.isTestnet ? 0 : a.isTestnet ? 1 : -1));
+
+        for (const chain of chainsOrdered) {
             const chainProgress = progress[chain.id];
 
             // Skip if already complete (all steps success)
